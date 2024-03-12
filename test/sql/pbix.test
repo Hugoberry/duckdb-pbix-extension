@@ -1,0 +1,23 @@
+# name: test/sql/pbix.test
+# description: test pbix extension
+# group: [pbix]
+
+# Before we load the extension, this will fail
+statement error
+SELECT pbix('Sam');
+----
+Catalog Error: Scalar Function with name pbix does not exist!
+
+# Require statement will ensure this test is run with this extension loaded
+require pbix
+
+# Confirm the extension works
+query I
+SELECT pbix('Sam');
+----
+Pbix Sam 🐥
+
+query I
+SELECT pbix_openssl_version('Michael');
+----
+<REGEX>:Pbix Michael, my linked OpenSSL version is OpenSSL.*
