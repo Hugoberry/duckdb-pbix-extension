@@ -24,14 +24,14 @@ inline void PbixScalarFun(DataChunk &args, ExpressionState &state, Vector &resul
 
 inline voide DecompressAndProcessPbix(DataChunk &args, ExpressionState &state, Vector &result) {
     auto &name_vector = args.data[0];
-    ifstream entryStream(file_name, ios::binary);
-    entryStream.seekg(data_offset, ios::beg);
+    ifstream entryStream(name_vector, std::ios::binary);
+    entryStream.seekg(102, std::ios::beg);
     XPress9Wrapper xpress9Wrapper;
     xpress9Wrapper.Initialize(false, true);
     vector<uint8_t> allDecompressedData;
     entryStream.seekg(0, ios::end);
     auto totalSize = entryStream.tellg();
-    entryStream.seekg(data_offset, ios::beg);
+    entryStream.seekg(102, ios::beg);
     while (entryStream.tellg() < totalSize) {
         uint32_t uncompressedSize;
         uint32_t compressedSize;
