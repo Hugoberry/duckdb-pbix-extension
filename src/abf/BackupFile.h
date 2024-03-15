@@ -1,11 +1,11 @@
 #pragma once
 
-#include <cstdint>;
-#include <string>;
-#include <vector>;
-#include <optional>;
-#include <iostream>;
-#include "tinyxml2.h";
+#include <cstdint>
+#include <string>
+#include <vector>
+#include <optional>
+#include <iostream>
+#include "tinyxml2.h"
 
 class BackupFile {
 public:

@@ -28,9 +28,9 @@ public:
     std::optional<std::string> Write;
     bool OlapInfo;
     bool IsTabular;
-    std::optional<Collations> Collations;
-    std::optional<Languages> Languages;
-    std::optional<FileGroups> FileGroups;
+    std::optional<Collations> collations;
+    std::optional<Languages> languages;
+    std::optional<FileGroups> fileGroups;
 
     static BackupLog from_xml(const std::vector<uint8_t>& buffer, const std::string& encoding);
 };
