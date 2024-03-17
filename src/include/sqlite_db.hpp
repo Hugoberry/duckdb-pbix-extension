@@ -1,29 +1,38 @@
+//===----------------------------------------------------------------------===//
+//                         DuckDB
+//
+// sqlite_db.hpp
+//
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
-#include "pbix_utils.hpp"
+#include "sqlite_utils.hpp"
+#include "sqlite_options.hpp"
 
 namespace duckdb {
-class PbixStatement;
+class SQLiteStatement;
 struct IndexInfo;
 
-class Pbix {
+class SQLiteDB {
 public:
-	Pbix();
-	Pbix(pbix *db);
-	~Pbix();
+	SQLiteDB();
+	SQLiteDB(sqlite3 *db);
+	~SQLiteDB();
 	// disable copy constructors
-	Pbix(const Pbix &other) = delete;
-	Pbix &operator=(const Pbix &) = delete;
+	SQLiteDB(const SQLiteDB &other) = delete;
+	SQLiteDB &operator=(const SQLiteDB &) = delete;
 	//! enable move constructors
-	Pbix(Pbix &&other) noexcept;
-	Pbix &operator=(Pbix &&) noexcept;
+	SQLiteDB(SQLiteDB &&other) noexcept;
+	SQLiteDB &operator=(SQLiteDB &&) noexcept;
 
-	pbix *db;
+	sqlite3 *db;
 
 public:
-	static Pbix Open(const string &path, const PbixOpenOptions &options, bool is_shared = false);
-	bool TryPrepare(const string &query, PbixStatement &result);
-	PbixStatement Prepare(const string &query);
+	static SQLiteDB Open(const string &path, const SQLiteOpenOptions &options, bool is_shared = false);
+	bool TryPrepare(const string &query, SQLiteStatement &result);
+	SQLiteStatement Prepare(const string &query);
 	void Execute(const string &query);
 	vector<string> GetTables();
 

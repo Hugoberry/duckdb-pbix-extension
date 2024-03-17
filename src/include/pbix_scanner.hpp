@@ -3,7 +3,7 @@
 #include "duckdb.hpp"
 
 namespace duckdb {
-class Pbix;
+class SQLiteDB;
 
 struct PbixBindData : public TableFunctionData {
 	string file_name;
@@ -16,7 +16,7 @@ struct PbixBindData : public TableFunctionData {
 	bool all_varchar = false;
 
 	idx_t rows_per_group = 122880;
-	Pbix *global_db;
+	SQLiteDB *global_db;
 };
 
 class PbixScanFunction : public TableFunction {
@@ -24,9 +24,5 @@ public:
 	PbixScanFunction();
 };
 
-class PbixAttachFunction : public TableFunction {
-public:
-	PbixAttachFunction();
-};
 
 } 
