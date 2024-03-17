@@ -1,0 +1,107 @@
+#include "duckdb/common/typedefs.hpp"
+#include "duckdb/function/replacement_scan.hpp"
+#include "duckdb/function/table_function.hpp"
+#include "duckdb/main/extension_util.hpp"
+#include "duckdb/parser/expression/constant_expression.hpp"
+#include "duckdb/parser/expression/function_expression.hpp"
+#include "duckdb/parser/tableref/table_function_ref.hpp"
+namespace duckdb
+{
+
+    //------------------------------------------------------------------------------
+    // Bind
+    //------------------------------------------------------------------------------
+
+    struct PbixBindInfo : public TableFunctionData {
+        // The name of the file to read
+        string file_name;
+        // Row Tag
+        string row_tag;
+        // The table layout we are dealing with
+        PbixTableLayout table_layout;
+        // The number of columns in the table
+        idx_t column_count;
+    };
+
+    static unique_ptr<FunctionData> Bind(ClientContext &context, TableFunctionBindInput &input,
+                                        vector<LogicalType> &return_types, vector<string> &names) {
+        auto result = make_uniq<PbixBindInfo>();
+
+        // first parameter is the file name
+        result->file_name = input.inputs[0].GetValue<string>();
+        result->row_tag = "row";
+        for (auto &kv : input.named_parameters) {
+            auto &name = kv.first;
+            auto &value = kv.second;
+            if (name == "row_tag") {
+                result->row_tag = value.GetValue<string>();
+            }
+        }
+
+        auto &fs = FileSystem::GetFileSystem(context);
+        auto handle = fs.OpenFile(result->file_name, FileFlags::FILE_FLAGS_READ);
+
+        // Sniff the file to figure out the format
+        auto sniff_result = SniffXLSX(*handle, result->row_tag);
+        result->table_layout = sniff_result.table_layout;
+        result->column_count = sniff_result.column_names.size();
+
+        return_types = sniff_result.column_types;
+        names = sniff_result.column_names;
+
+        return std::move(result);
+    }
+
+    //------------------------------------------------------------------------------
+    // Init Global
+    //------------------------------------------------------------------------------
+
+    struct PbixReaderGlobalState : public GlobalTableFunctionState {
+        unique_ptr<ColumnsAsRowAttributesParser> parser;
+    };
+
+    static unique_ptr<GlobalTableFunctionState> InitGlobal(ClientContext &context, TableFunctionInitInput &input) {
+        auto &bind_info = input.bind_data->Cast<PbixBindInfo>();
+        auto result = make_uniq<PbixReaderGlobalState>();
+
+        switch (bind_info.table_layout) {
+        case PbixTableLayout::ROWS:
+            result->parser = make_uniq<ColumnsAsRowAttributesParser>(context, bind_info.column_count, bind_info.row_tag);
+            break;
+        case PbixTableLayout::COLUMNS:
+            break; // TODO
+        case PbixTableLayout::FIELDS:
+            break; // TODO
+        }
+
+        return std::move(result);
+    }
+
+
+    //------------------------------------------------------------------------------
+    // Execute
+    //------------------------------------------------------------------------------
+    static void Execute(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
+        auto &bind_info = data_p.bind_data->Cast<PbixBindInfo>();
+        auto &global_state = data_p.global_state->Cast<PbixReaderGlobalState>();
+
+        // TODO:
+        if (!global_state.parser) {
+            output.SetCardinality(0);
+        }
+    }
+
+
+    //------------------------------------------------------------------------------
+    // Register
+    //------------------------------------------------------------------------------
+
+    void PbixReader::Register(DatabaseInstance &db) {
+
+        TableFunction xlsx_reader("read_pbix", {LogicalType::VARCHAR}, Execute, Bind, InitGlobal);
+        xlsx_reader.named_parameters["row_tag"] = LogicalType::VARCHAR;
+
+        ExtensionUtil::RegisterFunction(db, xlsx_reader);
+        db.config.replacement_scans.emplace_back(ReplacementScan);
+    }
+};
