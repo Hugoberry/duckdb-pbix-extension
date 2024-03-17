@@ -20,6 +20,7 @@ include_directories(src/include)
 include_directories(src/xpress9)
 include_directories(src/abf)
 
+add_subdirectory(src)
 set(EXTENSION_SOURCES src/pbix_extension.cpp)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
