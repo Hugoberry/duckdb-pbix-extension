@@ -1,8 +1,7 @@
 #include "AbfParser.h"
 #include <fstream>
 // tinyxml and sqlite3 linked through vcpkg
-#include <tinyxml2/tinyxml2.h>
-#include <sqlite3/sqlite3.h>
+
 
 using namespace tinyxml2;
 

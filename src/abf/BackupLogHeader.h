@@ -4,7 +4,6 @@
 
 #include <cstdint>
 #include <string>
-#include "tinyxml2.h"
 #include <vector>
 #include <optional>
 #include <iostream>

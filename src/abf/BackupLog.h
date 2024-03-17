@@ -7,7 +7,6 @@
 #include <string>
 #include <optional>
 #include <sstream>
-#include "tinyxml2.h"
 #include "Collations.h"
 #include "Languages.h"
 #include "FileGroups.h"

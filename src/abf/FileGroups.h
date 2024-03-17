@@ -4,7 +4,6 @@
 
 #include <vector>
 #include <optional>
-#include "tinyxml2.h"
 #include "FileGroup.h"
 
 class FileGroups {

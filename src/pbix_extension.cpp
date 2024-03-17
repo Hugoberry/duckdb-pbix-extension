@@ -20,6 +20,9 @@
 #include "Xpress9Wrapper.h"
 #include "AbfParser.h"
 
+#include <tinyxml2.h>
+#include <sqlite3.h>
+
 using namespace duckdb;
 using namespace std;
 
