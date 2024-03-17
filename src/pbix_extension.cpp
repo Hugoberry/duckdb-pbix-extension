@@ -56,6 +56,7 @@ namespace duckdb
             if (entryStream.is_open()) {
                 entryStream.close();
             }
+            xpress9Wrapper.Terminate();
         }
     };
 

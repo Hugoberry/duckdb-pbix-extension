@@ -1,5 +1,6 @@
 // BackupFile.cpp
 #include "BackupFile.h"
+#include <tinyxml2.h>
 
 using namespace tinyxml2;
 

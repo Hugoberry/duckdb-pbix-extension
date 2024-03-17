@@ -35,6 +35,7 @@ target_link_libraries(${EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 
 
+
 install(
   TARGETS ${EXTENSION_NAME}
   EXPORT "${DUCKDB_EXPORT_SET}"
