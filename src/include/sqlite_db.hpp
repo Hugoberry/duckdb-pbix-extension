@@ -31,6 +31,7 @@ public:
 
 public:
 	static SQLiteDB Open(const string &path, const SQLiteOpenOptions &options, bool is_shared = false);
+	static SQLiteDB OpenFromBuffer(const std::vector<unsigned char> &buffer);
 	bool TryPrepare(const string &query, SQLiteStatement &result);
 	SQLiteStatement Prepare(const string &query);
 	void Execute(const string &query);

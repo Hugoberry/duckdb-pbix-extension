@@ -28,7 +28,7 @@ std::vector<uint8_t> AbfParser::trim_buffer(const std::vector<uint8_t>& buffer) 
     return trimmed_buffer;
 }
 
-void AbfParser::process_data(const std::vector<uint8_t>& decompressed_buffer) {
+std::vector<uint8_t> AbfParser::process_data(const std::vector<uint8_t>& decompressed_buffer) {
     int offset = 72;
     int page = 0x1000;
 
@@ -53,27 +53,7 @@ void AbfParser::process_data(const std::vector<uint8_t>& decompressed_buffer) {
         int sqlite_size = static_cast<int>(sqlite.Size);
         std::vector<uint8_t> sqlite_buffer = read_buffer_bytes(decompressed_buffer, sqlite_offset, sqlite_size);
 
-        // Write sqlite_buffer to a temporary file
-        std::ofstream temp_file("temp.db", std::ios::binary);
-        temp_file.write(reinterpret_cast<const char*>(sqlite_buffer.data()), sqlite_buffer.size());
-
-        // Open the temporary file with sqlite3_open
-        sqlite3* db;
-        char* zErrMsg = 0;
-        if (sqlite3_open("temp.db", &db)) {
-            std::cerr << "Can't open database: " << sqlite3_errmsg(db) << std::endl;
-            return;
-        }
-
-        // Execute the query
-        std::string sql = "SELECT name FROM sqlite_schema WHERE type ='table' AND name NOT LIKE 'sqlite_%'";
-        if (sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg) != SQLITE_OK) {
-            std::cerr << "SQL error: " << zErrMsg << std::endl;
-            sqlite3_free(zErrMsg);
-        }
-
-        // Close the database
-        sqlite3_close(db);
+        return sqlite_buffer
 
     }
 }

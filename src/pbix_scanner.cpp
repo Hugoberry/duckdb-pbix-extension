@@ -13,6 +13,9 @@
 #include "duckdb/main/config.hpp"
 #include "duckdb/storage/storage_extension.hpp"
 
+#include "Xpress9Wrapper.h"
+#include "AbfParser.h"
+
 #include <cmath>
 
 namespace duckdb {
@@ -41,6 +44,63 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 	}
 };
 
+static SQLiteDB ExtractDB(ClientContext &context, const string &path){
+	uint32_t uncompressed_size;
+	uint32_t compressed_size;
+	size_t current_offset = 102;
+
+	auto &fs = duckdb::FileSystem::GetFileSystem(context);
+	auto handle = fs.OpenFile(path, duckdb::FileFlags::FILE_FLAGS_READ);
+
+	auto fsize = fs.GetFileSize(*handle);
+	auto buffer = std::vector<unsigned char>(fsize);
+	fs.Read(*handle, buffer.data(), fsize);
+
+	XPress9Wrapper xpress9Wrapper;
+	if(xpress9Wrapper.Initialize() == false){
+		throw std::runtime_error("Failed to initialize XPress9Wrapper");
+	}
+
+	// Buffer to store all decompressed data
+    std::vector<uint8_t> allDecompressedData;
+
+	while (current_offset < buffer.size()) {
+		memcpy(&uncompressed_size, buffer.data() + current_offset, sizeof(uint32_t));
+		current_offset += sizeof(uint32_t);
+		memcpy(&compressed_size, buffer.data() + current_offset, sizeof(uint32_t));
+		current_offset += sizeof(uint32_t);
+
+
+		// Write to stdout the uncompressed and compressed sizes
+		std::cout << "Uncompressed size: " << uncompressed_size << std::endl;
+		std::cout << "Compressed size: " << compressed_size << std::endl;
+		std::cout << "Data offset: " << current_offset << std::endl;
+
+		// Buffers for storing decompressed data
+		std::vector<uint8_t> x9DecompressedBuffer(uncompressed_size);
+
+		// Decompress the entire data
+		uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(buffer.data() + current_offset, compressed_size, x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
+
+		// Verify that the total decompressed size matches the expected size
+		if (totalDecompressedSize != uncompressed_size) {
+			throw std::runtime_error("Decompressed size does not match expected size.");
+		}
+		else {
+			// Add the decompressed data to the overall buffer
+			allDecompressedData.insert(allDecompressedData.end(), x9DecompressedBuffer.begin(), x9DecompressedBuffer.end());
+		}
+
+		current_offset += compressed_size;
+	}
+
+	AbfParser parser;
+	auto sqliteBuffer = parser.process_data(allDecompressedData);
+
+	return SQLiteDB::OpenFromBuffer(sqliteBuffer);
+
+}
+
 static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBindInput &input,
                                            vector<LogicalType> &return_types, vector<string> &names) {
 
@@ -52,7 +112,8 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 	SQLiteStatement stmt;
 	SQLiteOpenOptions options;
 	options.access_mode = AccessMode::READ_ONLY;
-	db = SQLiteDB::Open(result->file_name, options);
+	// db = SQLiteDB::Open(result->file_name, options);
+	db = ExtractDB(context, result->file_name);
 
 	ColumnList columns;
 	vector<unique_ptr<Constraint>> constraints;

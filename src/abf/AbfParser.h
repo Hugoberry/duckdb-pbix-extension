@@ -13,7 +13,7 @@
 
 class AbfParser {
 public:
-    void process_data(const std::vector<uint8_t>& decompressed_buffer);
+    std::vector<uint8_t> process_data(const std::vector<uint8_t>& decompressed_buffer);
 
 private:
     std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, long offset, int size);
