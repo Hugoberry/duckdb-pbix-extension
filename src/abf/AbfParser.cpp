@@ -53,8 +53,9 @@ std::vector<uint8_t> AbfParser::process_data(const std::vector<uint8_t>& decompr
         int sqlite_size = static_cast<int>(sqlite.Size);
         std::vector<uint8_t> sqlite_buffer = read_buffer_bytes(decompressed_buffer, sqlite_offset, sqlite_size);
 
-        return sqlite_buffer
+        return sqlite_buffer;
 
     }
+    return std::vector<uint8_t>();
 }
 

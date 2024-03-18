@@ -1,7 +1,5 @@
 #pragma once
 
-#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -9,6 +7,7 @@
 #include <iostream>
 #include <codecvt>
 #include <locale>
+#include "tinyxml2.h"
 
 class BackupLogHeader {
 public:

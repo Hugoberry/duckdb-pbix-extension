@@ -86,17 +86,17 @@ BackupLog BackupLog::from_xml(const std::vector<uint8_t>& buffer, const std::str
     }
     element = root->FirstChildElement("Collations");
     if (element) {
-        log.Collations = Collations::from_xml(*element);
+        log.collations = Collations::from_xml(*element);
     }
 
     element = root->FirstChildElement("Languages");
     if (element) {
-        log.Languages = Languages::from_xml(*element);
+        log.languages = Languages::from_xml(*element);
     }
 
     element = root->FirstChildElement("FileGroups");
     if (element) {
-        log.FileGroups = FileGroups::from_xml(*element);
+        log.fileGroups = FileGroups::from_xml(*element);
     }
 
     return log;

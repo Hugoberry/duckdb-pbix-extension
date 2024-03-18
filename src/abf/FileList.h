@@ -2,6 +2,7 @@
 
 #include <vector>
 #include "BackupFile.h"
+#include "tinyxml2.h"
 
 class FileList {
 public:

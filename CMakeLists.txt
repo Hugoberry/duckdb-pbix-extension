@@ -19,14 +19,30 @@ project(${TARGET_NAME})
 include_directories(src/include)
 include_directories(src/xpress9)
 include_directories(src/abf)
+# include_directories(src/third_party/tinyxml2)
 
 add_subdirectory(src)
 set(EXTENSION_SOURCES 
+    src/abf/AbfParser.cpp
+    src/abf/BackupFile.cpp
+    src/abf/BackupLog.cpp
+    src/abf/BackupLogHeader.cpp
+    src/abf/Collations.cpp
+    src/abf/FileGroup.cpp
+    src/abf/FileGroups.cpp
+    src/abf/FileList.cpp
+    src/abf/Languages.cpp
+    src/abf/VirtualDirectory.cpp
     src/pbix_extension.cpp
     src/pbix_scanner.cpp
     src/sqlite_db.cpp 
     src/sqlite_stmt.cpp
-    src/sqlite_utils.cpp)
+    src/sqlite_utils.cpp
+    src/tinyxml2.cpp
+    src/xpress9/Xpress9DecHuffman.c
+    src/xpress9/Xpress9DecLz77.c
+    src/xpress9/Xpress9Misc.c
+    src/xpress9/Xpress9Wrapper.cpp)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
