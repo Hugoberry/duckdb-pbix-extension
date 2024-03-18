@@ -93,9 +93,13 @@ static SQLiteDB ExtractDB(ClientContext &context, const string &path){
 
 		current_offset += compressed_size;
 	}
+	//cout first 10 characters of the decompressed data as ascii
+	std::cout << "Decompressed data: " << std::string(allDecompressedData.begin(), allDecompressedData.begin() + 40) << std::endl;
 
 	AbfParser parser;
 	auto sqliteBuffer = parser.process_data(allDecompressedData);
+	//cout first 10 characters of the sqlite buffer as ascii
+	std::cout << "SQLite buffer: " << std::string(sqliteBuffer.begin(), sqliteBuffer.begin() + 20) << std::endl;
 
 	return SQLiteDB::OpenFromBuffer(sqliteBuffer);
 
@@ -115,6 +119,8 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 	// db = SQLiteDB::Open(result->file_name, options);
 	db = ExtractDB(context, result->file_name);
 
+	std::cout << "Opened SQLite database" << std::endl;
+	
 	ColumnList columns;
 	vector<unique_ptr<Constraint>> constraints;
 
