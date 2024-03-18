@@ -34,14 +34,14 @@ SQLiteDB SQLiteDB::Open(const string &path, const SQLiteOpenOptions &options, bo
 	if (options.access_mode == AccessMode::READ_ONLY) {
 		flags |= SQLITE_OPEN_READONLY;
 	} else {
-		flags |= SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
+		flags |= SQLITE_OPEN_READWRITE ;//| SQLITE_OPEN_CREATE;
 	}
 	if (!is_shared) {
 		// FIXME: we should just make sure we are not re-using the same `sqlite3`
 		// object across threads
 		flags |= SQLITE_OPEN_NOMUTEX;
 	}
-	flags |= SQLITE_OPEN_EXRESCODE;
+	//flags |= SQLITE_OPEN_EXRESCODE;
 	auto rc = sqlite3_open_v2(path.c_str(), &result.db, flags, nullptr);
 	if (rc != SQLITE_OK) {
 		throw std::runtime_error("Unable to open database \"" + path + "\": " + string(sqlite3_errstr(rc)));

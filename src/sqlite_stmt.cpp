@@ -56,7 +56,7 @@ void SQLiteStatement::Close() {
 	stmt = nullptr;
 }
 
-void SQLiteStatement::CheckTypeMatches(const SqliteBindData &bind_data, sqlite3_value *val, int sqlite_column_type,
+void SQLiteStatement::CheckTypeMatches(const PbixBindData &bind_data, sqlite3_value *val, int sqlite_column_type,
                                        int expected_type, idx_t col_idx) {
 	D_ASSERT(stmt);
 	if (bind_data.all_varchar) {

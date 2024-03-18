@@ -21,7 +21,12 @@ include_directories(src/xpress9)
 include_directories(src/abf)
 
 add_subdirectory(src)
-set(EXTENSION_SOURCES src/pbix_extension.cpp)
+set(EXTENSION_SOURCES 
+    src/pbix_extension.cpp
+    src/pbix_scanner.cpp
+    src/sqlite_db.cpp 
+    src/sqlite_stmt.cpp
+    src/sqlite_utils.cpp)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
