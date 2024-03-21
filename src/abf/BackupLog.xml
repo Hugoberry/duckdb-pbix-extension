@@ -1,0 +1,116 @@
+<BackupLog>
+	<BackupRestoreSyncVersion>11.53</BackupRestoreSyncVersion>
+	<ServerRoot>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data</ServerRoot>
+	<SvrEncryptPwdFlag>true</SvrEncryptPwdFlag>
+	<ServerEnableBinaryXML>false</ServerEnableBinaryXML>
+	<ServerEnableCompression>false</ServerEnableCompression>
+	<CompressionFlag>false</CompressionFlag>
+	<EncryptionFlag>false</EncryptionFlag>
+	<ObjectName>e38ef3c3-a47a-4033-a06d-16db74e49809</ObjectName>
+	<ObjectId>e38ef3c3-a47a-4033-a06d-16db74e49809</ObjectId>
+	<Write>ReadWrite</Write>
+	<OlapInfo>false</OlapInfo>
+	<IsTabular>true</IsTabular>
+	<Collations/>
+	<Languages>
+		<Language>2057</Language>
+	</Languages>
+	<FileGroups>
+		<FileGroup>
+			<Class>100002</Class>
+			<ID>e38ef3c3-a47a-4033-a06d-16db74e49809</ID>
+			<Name>e38ef3c3-a47a-4033-a06d-16db74e49809</Name>
+			<ObjectVersion>0</ObjectVersion>
+			<PersistLocation>0</PersistLocation>
+			<PersistLocationPath>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db</PersistLocationPath>
+			<StorageLocationPath/>
+			<ObjectID>DAAF1E3D-F78A-4252-AD57-60FBD698D3D1</ObjectID>
+			<FileList>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db.xml</Path>
+					<StoragePath>16950F13B2E548E6AC1A</StoragePath>
+					<LastWriteTime>1394517847</LastWriteTime>
+					<Size>3753</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\0.CryptKey.bin</Path>
+					<StoragePath>DC2FD938BF394DCB954C</StoragePath>
+					<LastWriteTime>133152504879363066</LastWriteTime>
+					<Size>144</Size>
+				</BackupFile>
+			</FileList>
+		</FileGroup>
+		<FileGroup>
+			<Class>100069</Class>
+			<ID>e38ef3c3-a47a-4033-a06d-16db74e49809</ID>
+			<Name>e38ef3c3-a47a-4033-a06d-16db74e49809</Name>
+			<ObjectVersion>-1</ObjectVersion>
+			<PersistLocation>-1</PersistLocation>
+			<PersistLocationPath>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db</PersistLocationPath>
+			<StorageLocationPath/>
+			<ObjectID>00000000-0000-0000-0000-00</ObjectID>
+			<FileList>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\AAA (14).tbl\\18.prt\\1.AAA (14).RowNumber 2662979B 1795 4F74 8F37 6A1BA8059B61 (15).0.idf</Path>
+					<StoragePath>3A1D8BDF34334BAD9682</StoragePath>
+					<LastWriteTime>133152521640795730</LastWriteTime>
+					<Size>144</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\AAA (14).tbl\\18.prt\\1.AAA (14).RowNumber 2662979B 1795 4F74 8F37 6A1BA8059B61 (15).0.idfmeta</Path>
+					<StoragePath>3545CA93E8A14F62A850</StoragePath>
+					<LastWriteTime>133152521640795730</LastWriteTime>
+					<Size>264</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\AAA (14).tbl\\1.AAA (14).A (17).dictionary</Path>
+					<StoragePath>BA56E6432DD247968445</StoragePath>
+					<LastWriteTime>133152521640795730</LastWriteTime>
+					<Size>147</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\AAA (14).tbl\\18.prt\\1.AAA (14).A (17).0.idf</Path>
+					<StoragePath>09BE10E8FFA946FDB75B</StoragePath>
+					<LastWriteTime>133152521640795730</LastWriteTime>
+					<Size>152</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\AAA (14).tbl\\18.prt\\1.AAA (14).A (17).0.idfmeta</Path>
+					<StoragePath>CB3D24AE68CB4520B9BF</StoragePath>
+					<LastWriteTime>133152521640795730</LastWriteTime>
+					<Size>264</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\H$AAA (14)$A (17)$(65).tbl\\68.prt\\3.H$AAA (14)$A (17).POS_TO_ID.0.idf</Path>
+					<StoragePath>72C0A407ED784952BDD7</StoragePath>
+					<LastWriteTime>133152521640795730</LastWriteTime>
+					<Size>64</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\H$AAA (14)$A (17)$(65).tbl\\68.prt\\3.H$AAA (14)$A (17).POS_TO_ID.0.idfmeta</Path>
+					<StoragePath>D95A33FA3C5F4AE58723</StoragePath>
+					<LastWriteTime>133152521640795730</LastWriteTime>
+					<Size>456</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\H$AAA (14)$A (17)$(65).tbl\\68.prt\\3.H$AAA (14)$A (17).ID_TO_POS.0.idf</Path>
+					<StoragePath>F9359A5F7F1D4AE3B5B1</StoragePath>
+					<LastWriteTime>133152521640795730</LastWriteTime>
+					<Size>64</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\H$AAA (14)$A (17)$(65).tbl\\68.prt\\3.H$AAA (14)$A (17).ID_TO_POS.0.idfmeta</Path>
+					<StoragePath>1CF2EFB5B22F4AE18B9B</StoragePath>
+					<LastWriteTime>133152521640795730</LastWriteTime>
+					<Size>456</Size>
+				</BackupFile>
+				<BackupFile>
+					<Path>\\\\?\\C:\\Users\\igorc\\Microsoft\\Power BI Desktop Store App\\AnalysisServicesWorkspaces\\AnalysisServicesWorkspace_de254206-163a-441a-83ca-aecb669fc659\\Data\\e38ef3c3-a47a-4033-a06d-16db74e49809.0.db\\metadata.sqlitedb</Path>
+					<StoragePath>39782C6982D44A22B43F</StoragePath>
+					<LastWriteTime>133152521533424703</LastWriteTime>
+					<Size>278528</Size>
+				</BackupFile>
+			</FileList>
+		</FileGroup>
+	</FileGroups>
+</BackupLog>
