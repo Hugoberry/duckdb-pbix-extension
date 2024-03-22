@@ -32,6 +32,7 @@ set(EXTENSION_SOURCES
     src/abf/FileGroups.cpp
     src/abf/FileList.cpp
     src/abf/Languages.cpp
+    src/abf/LogBackupFile.cpp
     src/abf/VirtualDirectory.cpp
     src/pbix_extension.cpp
     src/pbix_scanner.cpp

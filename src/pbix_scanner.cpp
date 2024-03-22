@@ -157,7 +157,9 @@ static void PbixInitInternal(ClientContext &context, const PbixBindData &bind_da
 	if (!local_state.db) {
 		SQLiteOpenOptions options;
 		options.access_mode = AccessMode::READ_ONLY;
-		local_state.owned_db = SQLiteDB::Open(bind_data.file_name.c_str(), options);
+		local_state.owned_db = ExtractDB(context, bind_data.file_name.c_str());
+
+		// local_state.owned_db = SQLiteDB::Open(bind_data.file_name.c_str(), options);
 		local_state.db = &local_state.owned_db;
 	}
 

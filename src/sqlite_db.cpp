@@ -64,15 +64,16 @@ SQLiteDB SQLiteDB::Open(const string &path, const SQLiteOpenOptions &options, bo
 
 SQLiteDB SQLiteDB::OpenFromBuffer(const std::vector<unsigned char> &buffer){
         SQLiteDB result;
-
+		int flags = SQLITE_OPEN_PRIVATECACHE;
+		auto rc = sqlite3_open_v2(":memory:", &result.db, flags, nullptr);
         // Initialize a new database connection
-        if (sqlite3_open(":memory:", &result.db) != SQLITE_OK) {
-            throw std::runtime_error("Unable to create in-memory database");
+        if (rc != SQLITE_OK) {
+			throw std::runtime_error("Unable to open database " + string(sqlite3_errstr(rc)));
         }
 
 
         // Deserialize database from buffer into the main database
-        auto rc = sqlite3_deserialize(
+        rc = sqlite3_deserialize(
             result.db, "main", const_cast<unsigned char*>(buffer.data()), // pData
             buffer.size(), // szDb: number of bytes in the deserialization
             buffer.size(), // szBuf: total size of buffer pData[]

@@ -9,7 +9,7 @@ FileList FileList::from_xml(tinyxml2::XMLElement& element) {
     while (backupFileElement) {
         LogBackupFile file = LogBackupFile::from_value(*backupFileElement,"UTF-8");
         if (!fileList.BackupFiles) {
-            fileList.BackupFiles = std::vector<long>{};
+            fileList.BackupFiles = std::vector<LogBackupFile>{};
         }
         fileList.BackupFiles->push_back(file);
         backupFileElement = backupFileElement->NextSiblingElement("BackupFile");
