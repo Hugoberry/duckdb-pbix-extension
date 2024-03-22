@@ -64,8 +64,8 @@ SQLiteDB SQLiteDB::Open(const string &path, const SQLiteOpenOptions &options, bo
 
 SQLiteDB SQLiteDB::OpenFromBuffer(const std::vector<unsigned char> &buffer){
         SQLiteDB result;
-		int flags = SQLITE_OPEN_PRIVATECACHE;
-		auto rc = sqlite3_open_v2(":memory:", &result.db, flags, nullptr);
+		int flags = SQLITE_OPEN_SHAREDCACHE  | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_MEMORY;
+		auto rc = sqlite3_open_v2("abba.db", &result.db, flags, nullptr);
         // Initialize a new database connection
         if (rc != SQLITE_OK) {
 			throw std::runtime_error("Unable to open database " + string(sqlite3_errstr(rc)));
@@ -77,7 +77,7 @@ SQLiteDB SQLiteDB::OpenFromBuffer(const std::vector<unsigned char> &buffer){
             result.db, "main", const_cast<unsigned char*>(buffer.data()), // pData
             buffer.size(), // szDb: number of bytes in the deserialization
             buffer.size(), // szBuf: total size of buffer pData[]
-            SQLITE_DESERIALIZE_FREEONCLOSE // mFlags
+            SQLITE_DESERIALIZE_FREEONCLOSE | SQLITE_DESERIALIZE_READONLY // mFlags
         );
 
 
