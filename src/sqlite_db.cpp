@@ -21,10 +21,12 @@ SQLiteDB::~SQLiteDB() {
 
 SQLiteDB::SQLiteDB(SQLiteDB &&other) noexcept {
 	std::swap(db, other.db);
+	std::swap(dbBuffer, other.dbBuffer);
 }
 
 SQLiteDB &SQLiteDB::operator=(SQLiteDB &&other) noexcept {
 	std::swap(db, other.db);
+	std::swap(dbBuffer, other.dbBuffer);
 	return *this;
 }
 
@@ -62,10 +64,12 @@ SQLiteDB SQLiteDB::Open(const string &path, const SQLiteOpenOptions &options, bo
 	return result;
 }
 
-SQLiteDB SQLiteDB::OpenFromBuffer(const std::vector<unsigned char> &buffer){
+SQLiteDB SQLiteDB::OpenFromBuffer(const string &path, const SQLiteOpenOptions &options, const std::vector<unsigned char> &buffer){
         SQLiteDB result;
-		int flags = SQLITE_OPEN_SHAREDCACHE  | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_MEMORY;
-		auto rc = sqlite3_open_v2("abba.db", &result.db, flags, nullptr);
+		result.dbBuffer = buffer; // buffer for in-memory database
+		// int flags = SQLITE_OPEN_SHAREDCACHE  | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_MEMORY;
+		int flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_PRIVATECACHE;
+		auto rc = sqlite3_open_v2(":memory:", &result.db, flags, nullptr);
         // Initialize a new database connection
         if (rc != SQLITE_OK) {
 			throw std::runtime_error("Unable to open database " + string(sqlite3_errstr(rc)));
@@ -74,10 +78,10 @@ SQLiteDB SQLiteDB::OpenFromBuffer(const std::vector<unsigned char> &buffer){
 
         // Deserialize database from buffer into the main database
         rc = sqlite3_deserialize(
-            result.db, "main", const_cast<unsigned char*>(buffer.data()), // pData
-            buffer.size(), // szDb: number of bytes in the deserialization
-            buffer.size(), // szBuf: total size of buffer pData[]
-            SQLITE_DESERIALIZE_FREEONCLOSE | SQLITE_DESERIALIZE_READONLY // mFlags
+            result.db, "main", result.dbBuffer.data(), // pData
+            result.dbBuffer.size(), // szDb: number of bytes in the deserialization
+            result.dbBuffer.size(), // szBuf: total size of buffer pData[]
+            SQLITE_DESERIALIZE_READONLY | SQLITE_DESERIALIZE_RESIZEABLE // mFlags
         );
 
 
@@ -86,7 +90,20 @@ SQLiteDB SQLiteDB::OpenFromBuffer(const std::vector<unsigned char> &buffer){
             throw std::runtime_error("Unable to deserialize database: " + std::string(sqlite3_errstr(rc)));
         }
 
-        return result;
+		// default busy time-out of 5 seconds
+		if (options.busy_timeout > 0) {
+			if (options.busy_timeout > NumericLimits<int>::Maximum()) {
+				throw std::runtime_error("busy_timeout out of range - must be within valid range for type int");
+			}
+			rc = sqlite3_busy_timeout(result.db, int(options.busy_timeout));
+			if (rc != SQLITE_OK) {
+				throw std::runtime_error("Failed to set busy timeout");
+			}
+		}
+		if (!options.journal_mode.empty()) {
+			result.Execute("PRAGMA journal_mode=" + KeywordHelper::EscapeQuotes(options.journal_mode, '\''));
+		}
+		return result;
 }
 
 bool SQLiteDB::TryPrepare(const string &query, SQLiteStatement &stmt) {

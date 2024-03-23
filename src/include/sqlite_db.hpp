@@ -28,10 +28,11 @@ public:
 	SQLiteDB &operator=(SQLiteDB &&) noexcept;
 
 	sqlite3 *db;
+	std::vector<unsigned char> dbBuffer; // buffer for in-memory database
 
 public:
 	static SQLiteDB Open(const string &path, const SQLiteOpenOptions &options, bool is_shared = false);
-	static SQLiteDB OpenFromBuffer(const std::vector<unsigned char> &buffer);
+	static SQLiteDB OpenFromBuffer(const string &path, const SQLiteOpenOptions &options,const std::vector<unsigned char> &buffer);
 	bool TryPrepare(const string &query, SQLiteStatement &result);
 	SQLiteStatement Prepare(const string &query);
 	void Execute(const string &query);
