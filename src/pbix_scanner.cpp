@@ -3,6 +3,11 @@
 #include "sqlite_db.hpp"
 #include "sqlite_stmt.hpp"
 #include "pbix_scanner.hpp"
+
+#include <fstream>
+#include "kaitai/kaitaistream.h"
+#include "zip.h"
+
 #include <stdint.h>
 #include "duckdb/parser/parser.hpp"
 #include "duckdb/parser/expression/cast_expression.hpp"
@@ -52,17 +57,37 @@ static SQLiteDB ExtractDB(ClientContext &context, const string &path){
 	auto &fs = duckdb::FileSystem::GetFileSystem(context);
 	auto handle = fs.OpenFile(path, duckdb::FileFlags::FILE_FLAGS_READ);
 
-	auto fsize = fs.GetFileSize(*handle);
-	auto buffer = std::vector<unsigned char>(fsize);
-	fs.Read(*handle, buffer.data(), fsize);
+	std::ifstream is(path, std::ifstream::binary);
+	kaitai::kstream ks(&is);
+	zip_t data(&ks);
+	
+	//buffer for the DataModel
+	std::vector<unsigned char> buffer;
+	
+	// Loop through each section in the ZIP file
+    for (auto& section : *data.sections()) {
+        // The section type we're interested in is the local_file, which contains file_name
+        if (section->section_type() == 1027) { //LOCAL_FILE
+			auto localFile = static_cast<zip_t::local_file_t*>(section->body());
+            // Check if the file_name is "DatModel"
+            if (localFile->header()->file_name() == "DataModel") {
+				std::string str = localFile->body();
+				// std::copy(str.begin(), str.end(), std::back_inserter(buffer));
+				buffer = std::vector<unsigned char>(str.begin(), str.end());
+				break; // Stop the loop once we find the "DataModel" section
+            }
+        }
+    }
 
+
+	// Initialize the XPress9Wrapper
 	XPress9Wrapper xpress9Wrapper;
 	if(xpress9Wrapper.Initialize() == false){
 		throw std::runtime_error("Failed to initialize XPress9Wrapper");
 	}
 
 	// Buffer to store all decompressed data
-    std::vector<uint8_t> allDecompressedData;
+	std::vector<uint8_t> allDecompressedData;
 
 	while (current_offset < buffer.size()) {
 		memcpy(&uncompressed_size, buffer.data() + current_offset, sizeof(uint32_t));

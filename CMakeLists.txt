@@ -17,8 +17,13 @@ find_package(Crc32c REQUIRED)
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 
+set(STRING_ENCODING_TYPE "ICONV" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
+add_definitions(-DKS_STR_ENCODING_ICONV)
+
+
 project(${TARGET_NAME})
 include_directories(src/include)
+include_directories(src/kaitai)
 include_directories(src/xpress9)
 include_directories(src/abf)
 # include_directories(src/third_party/tinyxml2)
@@ -36,6 +41,9 @@ set(EXTENSION_SOURCES
     src/abf/Languages.cpp
     src/abf/LogBackupFile.cpp
     src/abf/VirtualDirectory.cpp
+    src/kaitai/kaitaistream.cpp
+    src/dos_datetime.cpp
+    src/zip.cpp
     src/pbix_extension.cpp
     src/pbix_scanner.cpp
     src/sqlite_db.cpp 
