@@ -2,6 +2,7 @@
   "dependencies": [
     "openssl",
     "tinyxml2",
-    "sqlite3"
+    "sqlite3",
+    "kaitai-struct-cpp-stl-runtime"
   ]
 }
