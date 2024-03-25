@@ -3,6 +3,7 @@
     "openssl",
     "tinyxml2",
     "sqlite3",
-    "kaitai-struct-cpp-stl-runtime"
+    "kaitai-struct-cpp-stl-runtime",
+    "crc32c"
   ]
 }

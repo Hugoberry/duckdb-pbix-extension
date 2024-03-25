@@ -9,8 +9,10 @@ set(TARGET_NAME pbix)
 # used in cmake with find_package. Feel free to remove or replace with other dependencies.
 # Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
 find_package(OpenSSL REQUIRED)
-find_package(tinyxml2 CONFIG REQUIRED)
-find_package(unofficial-sqlite3 CONFIG REQUIRED)
+find_package(tinyxml2 REQUIRED)
+find_package(unofficial-sqlite3 REQUIRED)
+find_package(Crc32c REQUIRED)
+
 
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
@@ -56,7 +58,8 @@ target_link_libraries(${EXTENSION_NAME} tinyxml2::tinyxml2)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} tinyxml2::tinyxml2)
 target_link_libraries(${EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
-
+target_link_libraries(${EXTENSION_NAME} Crc32c::crc32c)
+target_link_libraries(${LOADABLE_EXTENSION_NAME} Crc32c::crc32c)
 
 
 install(

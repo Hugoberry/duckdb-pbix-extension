@@ -5,13 +5,6 @@
 
 using namespace tinyxml2;
 
-static int callback(void* NotUsed, int argc, char** argv, char** azColName) {
-    for (int i = 0; i < argc; i++) {
-        std::cout << azColName[i] << ": " << (argv[i] ? argv[i] : "NULL") << std::endl;
-    }
-    std::cout << std::endl;
-    return 0;
-}
 std::vector<uint8_t> AbfParser::read_buffer_bytes(const std::vector<uint8_t>& buffer, long offset, int size) {
     std::vector<uint8_t> sub_buffer(size);
     std::copy(buffer.begin() + offset, buffer.begin() + offset + size, sub_buffer.begin());
