@@ -52,26 +52,15 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 };
 
 static SQLiteDB ExtractDB(ClientContext &context, const string &path){
-	uint32_t uncompressed_size;
-	uint32_t compressed_size;
-	size_t current_offset = 102;
-
-	// Buffer to store all decompressed data
-	std::vector<uint8_t> allDecompressedData;
-
-	// Initialize the XPress9Wrapper
-	XPress9Wrapper xpress9Wrapper;
-	if(xpress9Wrapper.Initialize() == false){
-		throw std::runtime_error("Failed to initialize XPress9Wrapper");
-	}
-
-	std::ifstream is(path, std::ifstream::binary);
-	kaitai::kstream ks(&is);
-	zip_t data(&ks);
+    // Open and parse the PBIX file
+    std::ifstream is_pbix(path, std::ifstream::binary);
+    if (!is_pbix.is_open()) {
+        throw std::runtime_error("Failed to open PBIX file");
+    }
+    kaitai::kstream ks_zip(&is_pbix);
+    zip_t data(&ks_zip);
 	
 	//buffer for the DataModel
-	std::vector<unsigned char> buffer;
-	uint32_t datamodel_size = 0;
 	std::string datamodel;
 	
 	// Loop through each section in the ZIP file
@@ -79,40 +68,43 @@ static SQLiteDB ExtractDB(ClientContext &context, const string &path){
         // The section type we're interested in is the local_file, which contains file_name
         if (section->section_type() == 1027) { //LOCAL_FILE
 			auto localFile = static_cast<zip_t::local_file_t*>(section->body());
-            // Check if the file_name is "DatModel"
+            // Check if the file_name is "DataModel"
             if (localFile->header()->file_name() == "DataModel") {
-				datamodel_size = localFile->header()->len_body_compressed();
 				datamodel = localFile->body();
-				// std::copy(datamodel.begin(), datamodel.end(), std::back_inserter(buffer));
-				buffer = std::vector<unsigned char>(datamodel.begin(), datamodel.end());
 				break; // Stop the loop once we find the "DataModel" section
             }
         }
     }
 
+    if (datamodel.empty()) {
+        throw std::runtime_error("DataModel not found in PBIX file");
+    }
 
-	std::istringstream iss(datamodel);
-	kaitai::kstream kss(&iss);
-	abf_xpress9_t abf_x9(&kss);
+	std::istringstream is_abf(datamodel);
+	kaitai::kstream ks_abf(&is_abf);
+	abf_xpress9_t abf_x9(&ks_abf);
 
-	std::cout << abf_x9.signature() << std::endl;
+	// Buffer to store all decompressed data
+	std::vector<uint8_t> allDecompressedData;
+	// Initialize the XPress9Wrapper
+	XPress9Wrapper xpress9Wrapper;
+	if(xpress9Wrapper.Initialize() == false){
+		throw std::runtime_error("Failed to initialize XPress9Wrapper");
+	}
 
 	// Loop through each chunk in the DataModel
 	for(auto& chunk : *abf_x9.chunks()){
-		// Get the uncompressed and compressed sizes
-		uncompressed_size = chunk->uncompressed();
-		compressed_size = chunk->compressed();
 
 		// Buffers for storing decompressed data
-		std::vector<uint8_t> x9DecompressedBuffer(uncompressed_size);
+		std::vector<uint8_t> x9DecompressedBuffer(chunk->uncompressed());
 		auto node = chunk->_raw_node();
 		std::vector<uint8_t> compressedData =  std::vector<unsigned char>(node.begin(), node.end());
 
 		// Decompress the entire data
-		uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(compressedData.data(), compressed_size, x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
+		uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(compressedData.data(), chunk->compressed(), x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
 
 		// Verify that the total decompressed size matches the expected size
-		if (totalDecompressedSize != uncompressed_size) {
+		if (totalDecompressedSize != chunk->uncompressed()) {
 			throw std::runtime_error("Decompressed size does not match expected size.");
 		}
 		else {
