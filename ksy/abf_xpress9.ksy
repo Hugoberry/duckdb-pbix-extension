@@ -21,6 +21,7 @@ types:
       type: u4
     - id: node
       type: node
+      size: compressed
 
   node:
     seq:
