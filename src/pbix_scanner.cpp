@@ -7,6 +7,8 @@
 #include <fstream>
 #include "kaitai/kaitaistream.h"
 #include "zip.h"
+#include "abf_xpress9.h"
+#include <sstream>
 
 #include <stdint.h>
 #include "duckdb/parser/parser.hpp"
@@ -54,8 +56,14 @@ static SQLiteDB ExtractDB(ClientContext &context, const string &path){
 	uint32_t compressed_size;
 	size_t current_offset = 102;
 
-	auto &fs = duckdb::FileSystem::GetFileSystem(context);
-	auto handle = fs.OpenFile(path, duckdb::FileFlags::FILE_FLAGS_READ);
+	// Buffer to store all decompressed data
+	std::vector<uint8_t> allDecompressedData;
+
+	// Initialize the XPress9Wrapper
+	XPress9Wrapper xpress9Wrapper;
+	if(xpress9Wrapper.Initialize() == false){
+		throw std::runtime_error("Failed to initialize XPress9Wrapper");
+	}
 
 	std::ifstream is(path, std::ifstream::binary);
 	kaitai::kstream ks(&is);
@@ -63,6 +71,8 @@ static SQLiteDB ExtractDB(ClientContext &context, const string &path){
 	
 	//buffer for the DataModel
 	std::vector<unsigned char> buffer;
+	uint32_t datamodel_size = 0;
+	std::string datamodel;
 	
 	// Loop through each section in the ZIP file
     for (auto& section : *data.sections()) {
@@ -71,41 +81,35 @@ static SQLiteDB ExtractDB(ClientContext &context, const string &path){
 			auto localFile = static_cast<zip_t::local_file_t*>(section->body());
             // Check if the file_name is "DatModel"
             if (localFile->header()->file_name() == "DataModel") {
-				std::string str = localFile->body();
-				// std::copy(str.begin(), str.end(), std::back_inserter(buffer));
-				buffer = std::vector<unsigned char>(str.begin(), str.end());
+				datamodel_size = localFile->header()->len_body_compressed();
+				datamodel = localFile->body();
+				// std::copy(datamodel.begin(), datamodel.end(), std::back_inserter(buffer));
+				buffer = std::vector<unsigned char>(datamodel.begin(), datamodel.end());
 				break; // Stop the loop once we find the "DataModel" section
             }
         }
     }
 
 
-	// Initialize the XPress9Wrapper
-	XPress9Wrapper xpress9Wrapper;
-	if(xpress9Wrapper.Initialize() == false){
-		throw std::runtime_error("Failed to initialize XPress9Wrapper");
-	}
+	std::istringstream iss(datamodel);
+	kaitai::kstream kss(&iss);
+	abf_xpress9_t abf_x9(&kss);
 
-	// Buffer to store all decompressed data
-	std::vector<uint8_t> allDecompressedData;
+	std::cout << abf_x9.signature() << std::endl;
 
-	while (current_offset < buffer.size()) {
-		memcpy(&uncompressed_size, buffer.data() + current_offset, sizeof(uint32_t));
-		current_offset += sizeof(uint32_t);
-		memcpy(&compressed_size, buffer.data() + current_offset, sizeof(uint32_t));
-		current_offset += sizeof(uint32_t);
-
-
-		// Write to stdout the uncompressed and compressed sizes
-		// std::cout << "Uncompressed size: " << uncompressed_size << std::endl;
-		// std::cout << "Compressed size: " << compressed_size << std::endl;
-		// std::cout << "Data offset: " << current_offset << std::endl;
+	// Loop through each chunk in the DataModel
+	for(auto& chunk : *abf_x9.chunks()){
+		// Get the uncompressed and compressed sizes
+		uncompressed_size = chunk->uncompressed();
+		compressed_size = chunk->compressed();
 
 		// Buffers for storing decompressed data
 		std::vector<uint8_t> x9DecompressedBuffer(uncompressed_size);
+		auto node = chunk->_raw_node();
+		std::vector<uint8_t> compressedData =  std::vector<unsigned char>(node.begin(), node.end());
 
 		// Decompress the entire data
-		uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(buffer.data() + current_offset, compressed_size, x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
+		uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(compressedData.data(), compressed_size, x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
 
 		// Verify that the total decompressed size matches the expected size
 		if (totalDecompressedSize != uncompressed_size) {
@@ -115,16 +119,10 @@ static SQLiteDB ExtractDB(ClientContext &context, const string &path){
 			// Add the decompressed data to the overall buffer
 			allDecompressedData.insert(allDecompressedData.end(), x9DecompressedBuffer.begin(), x9DecompressedBuffer.end());
 		}
-
-		current_offset += compressed_size;
 	}
-	//cout first 10 characters of the decompressed data as ascii
-	// std::cout << "Decompressed data: " << std::string(allDecompressedData.begin(), allDecompressedData.begin() + 40) << std::endl;
 
 	AbfParser parser;
 	auto sqliteBuffer = parser.process_data(allDecompressedData);
-	//cout first 10 characters of the sqlite buffer as ascii
-	// std::cout << "SQLite buffer: " << std::string(sqliteBuffer.begin(), sqliteBuffer.begin() + 20) << std::endl;
 
 	SQLiteOpenOptions options;
 	return SQLiteDB::OpenFromBuffer(path, options, sqliteBuffer);

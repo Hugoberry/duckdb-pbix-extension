@@ -44,6 +44,7 @@ set(EXTENSION_SOURCES
     src/kaitai/kaitaistream.cpp
     src/dos_datetime.cpp
     src/zip.cpp
+    src/abf_xpress9.cpp
     src/pbix_extension.cpp
     src/pbix_scanner.cpp
     src/sqlite_db.cpp 
