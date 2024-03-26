@@ -43,8 +43,7 @@ set(EXTENSION_SOURCES
     src/abf/VirtualDirectory.cpp
     src/kaitai/kaitaistream.cpp
     src/dos_datetime.cpp
-    src/zip.cpp
-    src/abf_xpress9.cpp
+    src/pbix.cpp
     src/pbix_extension.cpp
     src/pbix_scanner.cpp
     src/sqlite_db.cpp 
