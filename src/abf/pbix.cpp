@@ -817,6 +817,7 @@ pbix_t::header_t::header_t(kaitai::kstream* p__io, pbix_t::node_t* p__parent, pb
     m__parent = p__parent;
     m__root = p__root;
     m_huffman_table_flags = 0;
+    m__io__raw_huffman_table_flags = 0;
 
     try {
         _read();
@@ -833,7 +834,9 @@ void pbix_t::header_t::_read() {
     }
     m_orig_size = m__io->read_u4le();
     m_encoded_size = m__io->read_u4le();
-    m_huffman_table_flags = new huffman_flags_t(m__io, this, m__root);
+    m__raw_huffman_table_flags = m__io->read_bytes(4);
+    m__io__raw_huffman_table_flags = new kaitai::kstream(m__raw_huffman_table_flags);
+    m_huffman_table_flags = new huffman_flags_t(m__io__raw_huffman_table_flags, this, m__root);
     m_zero = m__io->read_u4le();
     m_session_signature = m__io->read_u4le();
     m_block_index = m__io->read_u4le();
@@ -845,6 +848,9 @@ pbix_t::header_t::~header_t() {
 }
 
 void pbix_t::header_t::_clean_up() {
+    if (m__io__raw_huffman_table_flags) {
+        delete m__io__raw_huffman_table_flags; m__io__raw_huffman_table_flags = 0;
+    }
     if (m_huffman_table_flags) {
         delete m_huffman_table_flags; m_huffman_table_flags = 0;
     }

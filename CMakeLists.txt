@@ -12,6 +12,13 @@ find_package(OpenSSL REQUIRED)
 find_package(tinyxml2 REQUIRED)
 find_package(unofficial-sqlite3 REQUIRED)
 find_package(Crc32c REQUIRED)
+# find_package(kaitai-struct-cpp-stl-runtime REQUIRED)
+if(NOT Crc32c_FOUND)
+    message(FATAL_ERROR "Crc32c not found")
+endif()
+
+find_package(Threads REQUIRED)
+
 
 
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
@@ -28,7 +35,7 @@ include_directories(src/xpress9)
 include_directories(src/abf)
 # include_directories(src/third_party/tinyxml2)
 
-add_subdirectory(src)
+# add_subdirectory(src)
 set(EXTENSION_SOURCES 
     src/abf/AbfParser.cpp
     src/abf/BackupFile.cpp
@@ -68,6 +75,10 @@ target_link_libraries(${EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${EXTENSION_NAME} Crc32c::crc32c)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} Crc32c::crc32c)
+target_link_libraries(${EXTENSION_NAME}  Threads::Threads)
+target_link_libraries(${LOADABLE_EXTENSION_NAME}  Threads::Threads)
+# target_link_libraries(${EXTENSION_NAME} kaitai::kaitai_struct_cpp_stl_runtime)
+# target_link_libraries(${LOADABLE_EXTENSION_NAME} kaitai::kaitai_struct_cpp_stl_runtime)
 
 
 install(

@@ -10,6 +10,8 @@
 #include "BackupFile.h"
 #include "BackupLog.h"
 
+#include <crc32c/crc32c.h>
+
 #include <fstream>
 #include "../kaitai/kaitaistream.h"
 #include "pbix.h"

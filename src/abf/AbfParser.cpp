@@ -56,11 +56,59 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
             throw std::runtime_error("Failed to initialize XPress9Wrapper");
         }
 
+        auto chunk_count = datamodel->chunks()->size();
+
         for (auto& chunk : *datamodel->chunks()) {
+
+            if(chunk->node()->header()->block_index()>0 && chunk->node()->header()->block_index() < chunk_count-20){
+                continue;
+            }
+            std::vector<uint8_t> compressedData;
+            if(chunk->node()->header()->block_index() != block_index_iterator){
+                block_index_iterator++;
+                //make a copy of the header structure
+                auto header = chunk->node()->header();
+                //searialize it back to a buffer
+               
+                std::vector<uint8_t> header_buffer;
+                // Example serialization code
+                auto write_uint32 = [&](uint32_t value) {
+                    header_buffer.push_back((value >> 24) & 0xFF);
+                    header_buffer.push_back((value >> 16) & 0xFF);
+                    header_buffer.push_back((value >> 8) & 0xFF);
+                    header_buffer.push_back(value & 0xFF);
+                };
+
+                std::copy(header->xpress_magic().begin(), header->xpress_magic().end(), std::back_inserter(header_buffer));
+
+                write_uint32(header->orig_size());
+                write_uint32(header->encoded_size());
+                std::copy(header->_raw_huffman_table_flags().begin(), header->_raw_huffman_table_flags().end(), std::back_inserter(header_buffer));
+                write_uint32(header->zero());
+                write_uint32(header->session_signature());
+                write_uint32(block_index_iterator);
+
+                std::cout << std::hex << std::showbase<< std::uppercase;
+
+                std::cout << "block_index_iterator: " << block_index_iterator << std::endl;
+                std::cout << "header->block_index(): " << header->block_index() << std::endl;
+                std::cout << "header->crc32(): " << header->crc32() << std::endl;
+                auto crc32 = crc32c::Crc32c(header_buffer.data(), header_buffer.size());
+                write_uint32(crc32);
+                std::cout << "crc32: " << crc32 << std::endl;
+                std::cout << "header " << header << std::endl;
+                // std::cout << "header_buffer " << header_buffer << std::endl;
+
+                std::copy(chunk->node()->segments().begin(), chunk->node()->segments().end(), std::back_inserter(header_buffer));
+
+                compressedData =  std::vector<unsigned char>(header_buffer.begin(), header_buffer.end());    
+            } else {
+                auto node = chunk->_raw_node();
+                compressedData =  std::vector<unsigned char>(node.begin(), node.end());    
+            }
             // Buffers for storing decompressed data
             std::vector<uint8_t> x9DecompressedBuffer(chunk->uncompressed());
-            auto node = chunk->_raw_node();
-            std::vector<uint8_t> compressedData =  std::vector<unsigned char>(node.begin(), node.end());
+
 
             // Decompress the entire data
             uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(compressedData.data(), chunk->compressed(), x9DecompressedBuffer.data(), x9DecompressedBuffer.size());

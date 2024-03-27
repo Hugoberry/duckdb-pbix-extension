@@ -6,8 +6,11 @@ EXT_CONFIG=${PROJ_DIR}extension_config.cmake
 
 
 # Setting CMAKE_PREFIX_PATH environment variable
-export CMAKE_PREFIX_PATH := vcpkg_installed/x64-linux:${CMAKE_PREFIX_PATH}
+# export CMAKE_PREFIX_PATH := vcpkg_installed/x64-linux:${CMAKE_PREFIX_PATH}
 # export CMAKE_PREFIX_PATH := vcpkg_installed/x64-linux/share/unofficial-sqlite3:${CMAKE_PREFIX_PATH}
+
+VCPKG_TOOLCHAIN_FILE=/workspaces/duckdb-pbix-extension/vcpkg/scripts/buildsystems/vcpkg.cmake
+
 
 # Include the Makefile from extension-ci-tools
 include extension-ci-tools/makefiles/duckdb_extension.Makefile

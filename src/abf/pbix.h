@@ -920,6 +920,8 @@ public:
         uint32_t m_crc32;
         pbix_t* m__root;
         pbix_t::node_t* m__parent;
+        std::string m__raw_huffman_table_flags;
+        kaitai::kstream* m__io__raw_huffman_table_flags;
 
     public:
 
@@ -936,6 +938,8 @@ public:
         uint32_t crc32() const { return m_crc32; }
         pbix_t* _root() const { return m__root; }
         pbix_t::node_t* _parent() const { return m__parent; }
+        std::string _raw_huffman_table_flags() const { return m__raw_huffman_table_flags; }
+        kaitai::kstream* _io__raw_huffman_table_flags() const { return m__io__raw_huffman_table_flags; }
     };
 
     class node_t : public kaitai::kstruct {
