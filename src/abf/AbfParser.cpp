@@ -21,66 +21,15 @@ std::vector<uint8_t> AbfParser::trim_buffer(const std::vector<uint8_t>& buffer) 
     return trimmed_buffer;
 }
 
-std::vector<uint8_t> AbfParser::process_data(const std::vector<uint8_t>& decompressed_buffer) {
+std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
     int offset = 72;
     int page = 0x1000;
+    bool parsed_backup_log_header = false;
+    int virtual_directory_offset=0;
+    int virtual_directory_size=0;
+    int abf_currsor = 0;
+    uint32_t block_index_iterator = 0;
 
-    std::vector<uint8_t> backup_log_header_buffer = read_buffer_bytes(decompressed_buffer, offset, page - offset);
-    backup_log_header_buffer = trim_buffer(backup_log_header_buffer);
-    BackupLogHeader backup_log_header = BackupLogHeader::from_xml(backup_log_header_buffer, "UTF-16");
-
-    int virtual_directory_offset = static_cast<int>(backup_log_header.m_cbOffsetHeader);
-    int virtual_directory_size = static_cast<int>(backup_log_header.DataSize);
-    std::vector<uint8_t> virtual_directory_buffer = read_buffer_bytes(decompressed_buffer, virtual_directory_offset, virtual_directory_size);
-    VirtualDirectory virtual_directory = VirtualDirectory::from_xml(virtual_directory_buffer, "UTF-8");
-
-    if (virtual_directory.backupFiles && !virtual_directory.backupFiles->empty()) {
-        BackupFile log = virtual_directory.backupFiles->back();
-        int backup_file_offset = static_cast<int>(log.m_cbOffsetHeader);
-        int backup_file_size = static_cast<int>(log.Size);
-        std::vector<uint8_t> backup_log_buffer = read_buffer_bytes(decompressed_buffer, backup_file_offset+2, backup_file_size-2);
-        BackupLog backup_log = BackupLog::from_xml(backup_log_buffer, "UTF-16");
-
-        auto sqlite = (*virtual_directory.backupFiles)[static_cast<int>(virtual_directory.backupFiles->size()) - 2];
-        int sqlite_offset = static_cast<int>(sqlite.m_cbOffsetHeader);
-        int sqlite_size = static_cast<int>(sqlite.Size);
-        std::vector<uint8_t> sqlite_buffer = read_buffer_bytes(decompressed_buffer, sqlite_offset, sqlite_size);
-
-        return sqlite_buffer;
-
-    }
-    return std::vector<uint8_t>();
-}
-
-std::vector<uint8_t> AbfParser::decompress_datamodel(pbix_t::abf_x9_t* datamodel) {
-    std::vector<uint8_t> allDecompressedData;
-    XPress9Wrapper xpress9Wrapper;
-    if (!xpress9Wrapper.Initialize()) {
-        throw std::runtime_error("Failed to initialize XPress9Wrapper");
-    }
-
-    for (auto& chunk : *datamodel->chunks()) {
-		// Buffers for storing decompressed data
-		std::vector<uint8_t> x9DecompressedBuffer(chunk->uncompressed());
-		auto node = chunk->_raw_node();
-		std::vector<uint8_t> compressedData =  std::vector<unsigned char>(node.begin(), node.end());
-
-		// Decompress the entire data
-		uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(compressedData.data(), chunk->compressed(), x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
-
-		// Verify that the total decompressed size matches the expected size
-		if (totalDecompressedSize != chunk->uncompressed()) {
-			throw std::runtime_error("Decompressed size does not match expected size.");
-		}
-		else {
-			// Add the decompressed data to the overall buffer
-			allDecompressedData.insert(allDecompressedData.end(), x9DecompressedBuffer.begin(), x9DecompressedBuffer.end());
-		}
-    }
-    return process_data(allDecompressedData);
-}
-
-std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
     std::ifstream is_pbix(path, std::ifstream::binary);
     if (!is_pbix.is_open()) {
         throw std::runtime_error("Failed to open PBIX file");
@@ -100,6 +49,59 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
 
         // If we reach here, we have found the DataModel section
         auto datamodel = localFile->datamodel();
-        return decompress_datamodel(datamodel);
+        
+        std::vector<uint8_t> allDecompressedData;
+        XPress9Wrapper xpress9Wrapper;
+        if (!xpress9Wrapper.Initialize()) {
+            throw std::runtime_error("Failed to initialize XPress9Wrapper");
+        }
+
+        for (auto& chunk : *datamodel->chunks()) {
+            // Buffers for storing decompressed data
+            std::vector<uint8_t> x9DecompressedBuffer(chunk->uncompressed());
+            auto node = chunk->_raw_node();
+            std::vector<uint8_t> compressedData =  std::vector<unsigned char>(node.begin(), node.end());
+
+            // Decompress the entire data
+            uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(compressedData.data(), chunk->compressed(), x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
+
+            // Verify that the total decompressed size matches the expected size
+            if (totalDecompressedSize != chunk->uncompressed()) {
+                throw std::runtime_error("Decompressed size does not match expected size.");
+            }
+            else {
+                // Add the decompressed data to the overall buffer
+                allDecompressedData.insert(allDecompressedData.end(), x9DecompressedBuffer.begin(), x9DecompressedBuffer.end());
+            }
+
+            if(!parsed_backup_log_header){
+                std::vector<uint8_t> backup_log_header_buffer = read_buffer_bytes(allDecompressedData, offset, page - offset);
+                backup_log_header_buffer = trim_buffer(backup_log_header_buffer);
+                BackupLogHeader backup_log_header = BackupLogHeader::from_xml(backup_log_header_buffer, "UTF-16");
+                virtual_directory_offset = static_cast<int>(backup_log_header.m_cbOffsetHeader);
+                virtual_directory_size = static_cast<int>(backup_log_header.DataSize);
+                parsed_backup_log_header = true;
+            }
+            
+            if(abf_currsor + totalDecompressedSize >= virtual_directory_offset + virtual_directory_size){
+                std::vector<uint8_t> virtual_directory_buffer = read_buffer_bytes(allDecompressedData, virtual_directory_offset, virtual_directory_size);
+                VirtualDirectory virtual_directory = VirtualDirectory::from_xml(virtual_directory_buffer, "UTF-8");
+
+                BackupFile log = virtual_directory.backupFiles->back();
+                int backup_file_offset = static_cast<int>(log.m_cbOffsetHeader);
+                int backup_file_size = static_cast<int>(log.Size);
+                std::vector<uint8_t> backup_log_buffer = read_buffer_bytes(allDecompressedData, backup_file_offset+2, backup_file_size-2);
+                BackupLog backup_log = BackupLog::from_xml(backup_log_buffer, "UTF-16");
+
+                auto sqlite = (*virtual_directory.backupFiles)[static_cast<int>(virtual_directory.backupFiles->size()) - 2];
+                int sqlite_offset = static_cast<int>(sqlite.m_cbOffsetHeader);
+                int sqlite_size = static_cast<int>(sqlite.Size);
+                std::vector<uint8_t> sqlite_buffer = read_buffer_bytes(allDecompressedData, sqlite_offset, sqlite_size);
+
+                return sqlite_buffer;
+            }
+            abf_currsor += chunk->uncompressed();
+        }
+
     }
 }
