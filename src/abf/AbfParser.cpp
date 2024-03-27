@@ -52,3 +52,54 @@ std::vector<uint8_t> AbfParser::process_data(const std::vector<uint8_t>& decompr
     return std::vector<uint8_t>();
 }
 
+std::vector<uint8_t> AbfParser::decompress_datamodel(pbix_t::abf_x9_t* datamodel) {
+    std::vector<uint8_t> allDecompressedData;
+    XPress9Wrapper xpress9Wrapper;
+    if (!xpress9Wrapper.Initialize()) {
+        throw std::runtime_error("Failed to initialize XPress9Wrapper");
+    }
+
+    for (auto& chunk : *datamodel->chunks()) {
+		// Buffers for storing decompressed data
+		std::vector<uint8_t> x9DecompressedBuffer(chunk->uncompressed());
+		auto node = chunk->_raw_node();
+		std::vector<uint8_t> compressedData =  std::vector<unsigned char>(node.begin(), node.end());
+
+		// Decompress the entire data
+		uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(compressedData.data(), chunk->compressed(), x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
+
+		// Verify that the total decompressed size matches the expected size
+		if (totalDecompressedSize != chunk->uncompressed()) {
+			throw std::runtime_error("Decompressed size does not match expected size.");
+		}
+		else {
+			// Add the decompressed data to the overall buffer
+			allDecompressedData.insert(allDecompressedData.end(), x9DecompressedBuffer.begin(), x9DecompressedBuffer.end());
+		}
+    }
+    return process_data(allDecompressedData);
+}
+
+std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
+    std::ifstream is_pbix(path, std::ifstream::binary);
+    if (!is_pbix.is_open()) {
+        throw std::runtime_error("Failed to open PBIX file");
+    }
+    kaitai::kstream ks_pbix(&is_pbix);
+    pbix_t data(&ks_pbix);
+
+    // Loop through each section in the ZIP file
+    for (auto& section : *data.sections()) {
+        if (section->section_type() != 1027) { // Not a LOCAL_FILE, skip it
+            continue;
+        }
+        auto localFile = static_cast<pbix_t::local_file_t*>(section->body());
+        if (localFile->header()->file_name() != "DataModel") { // Not "DataModel", skip it
+            continue;
+        }
+
+        // If we reach here, we have found the DataModel section
+        auto datamodel = localFile->datamodel();
+        return decompress_datamodel(datamodel);
+    }
+}

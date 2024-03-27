@@ -10,12 +10,20 @@
 #include "BackupFile.h"
 #include "BackupLog.h"
 
+#include <fstream>
+#include "../kaitai/kaitaistream.h"
+#include "pbix.h"
+#include <sstream>
+
+#include "Xpress9Wrapper.h"
 
 class AbfParser {
 public:
-    std::vector<uint8_t> process_data(const std::vector<uint8_t>& decompressed_buffer);
+    static std::vector<uint8_t> process_data(const std::vector<uint8_t>& decompressed_buffer);
+    static std::vector<uint8_t> get_sqlite(const std::string &path);
+    static std::vector<uint8_t> decompress_datamodel(pbix_t::abf_x9_t* datamodel);
 
 private:
-    std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, long offset, int size);
-    std::vector<uint8_t> trim_buffer(const std::vector<uint8_t>& buffer);
+    static std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, long offset, int size);
+    static std::vector<uint8_t> trim_buffer(const std::vector<uint8_t>& buffer);
 };

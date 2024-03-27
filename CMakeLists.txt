@@ -42,8 +42,8 @@ set(EXTENSION_SOURCES
     src/abf/LogBackupFile.cpp
     src/abf/VirtualDirectory.cpp
     src/kaitai/kaitaistream.cpp
-    src/dos_datetime.cpp
-    src/pbix.cpp
+    src/abf/dos_datetime.cpp
+    src/abf/pbix.cpp
     src/pbix_extension.cpp
     src/pbix_scanner.cpp
     src/sqlite_db.cpp 

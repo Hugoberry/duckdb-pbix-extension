@@ -3,7 +3,7 @@
 
 // This is a generated file! Please edit source .ksy file and use kaitai-struct-compiler to rebuild
 
-#include "kaitai/kaitaistruct.h"
+#include "../kaitai/kaitaistruct.h"
 #include <stdint.h>
 
 #if KAITAI_STRUCT_VERSION < 9000L
