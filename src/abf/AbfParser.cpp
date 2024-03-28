@@ -73,17 +73,25 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
                 std::vector<uint8_t> header_buffer;
                 // Example serialization code
                 auto write_uint32 = [&](uint32_t value) {
-                    header_buffer.push_back((value >> 24) & 0xFF);
-                    header_buffer.push_back((value >> 16) & 0xFF);
-                    header_buffer.push_back((value >> 8) & 0xFF);
                     header_buffer.push_back(value & 0xFF);
+                    header_buffer.push_back((value >> 8) & 0xFF);
+                    header_buffer.push_back((value >> 16) & 0xFF);
+                    header_buffer.push_back((value >> 24) & 0xFF);
                 };
+                auto magic = header->xpress_magic();
 
-                std::copy(header->xpress_magic().begin(), header->xpress_magic().end(), std::back_inserter(header_buffer));
+                header_buffer.insert(header_buffer.end(), magic.begin(), magic.end());
 
+                // std::copy(header->xpress_magic().begin(), header->xpress_magic().end(), std::back_inserter(header_buffer));
+
+                // header_buffer.push_back(header->orig_size());
                 write_uint32(header->orig_size());
                 write_uint32(header->encoded_size());
-                std::copy(header->_raw_huffman_table_flags().begin(), header->_raw_huffman_table_flags().end(), std::back_inserter(header_buffer));
+
+                auto huff = header->_raw_huffman_table_flags();
+
+                header_buffer.insert(header_buffer.end(), huff.begin(), huff.end());
+                // std::copy(header->_raw_huffman_table_flags().begin(), header->_raw_huffman_table_flags().end(), std::back_inserter(header_buffer));
                 write_uint32(header->zero());
                 write_uint32(header->session_signature());
                 write_uint32(block_index_iterator);
@@ -98,8 +106,10 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
                 std::cout << "crc32: " << crc32 << std::endl;
                 std::cout << "header " << header << std::endl;
                 // std::cout << "header_buffer " << header_buffer << std::endl;
+                auto segments = chunk->node()->segments();
 
-                std::copy(chunk->node()->segments().begin(), chunk->node()->segments().end(), std::back_inserter(header_buffer));
+                header_buffer.insert(header_buffer.end(), segments.begin(), segments.end());
+                // std::copy(chunk->node()->segments().begin(), chunk->node()->segments().end(), std::back_inserter(header_buffer));
 
                 compressedData =  std::vector<unsigned char>(header_buffer.begin(), header_buffer.end());    
             } else {
