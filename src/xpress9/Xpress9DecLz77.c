@@ -1059,7 +1059,7 @@ Xpress9DecoderFetchDecompressedData (
 
             // shift out the left most uBytesNeeded bytes keeping windowsize bytes.
             DEBUG_PERF_START (pDecoder->m_DebugPerf.m_uShift);
-            memmove (
+            memcpy (
                 pDecoder->m_BufferData.m_pBufferData,
                 pDecoder->m_BufferData.m_pBufferData + uBytesNeeded,
                 POWER2 (pDecoder->m_DecodeData.m_uWindowSizeLog2)

@@ -60,7 +60,9 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
 
         for (auto& chunk : *datamodel->chunks()) {
 
+            
             if(chunk->node()->header()->block_index()>0 && chunk->node()->header()->block_index() < chunk_count-20){
+                abf_currsor += chunk->uncompressed();
                 continue;
             }
             std::vector<uint8_t> compressedData;
@@ -69,9 +71,8 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
                 //make a copy of the header structure
                 auto header = chunk->node()->header();
                 //searialize it back to a buffer
-               
                 std::vector<uint8_t> header_buffer;
-                // Example serialization code
+                // UInt32 serialization routine
                 auto write_uint32 = [&](uint32_t value) {
                     header_buffer.push_back(value & 0xFF);
                     header_buffer.push_back((value >> 8) & 0xFF);
@@ -79,38 +80,19 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
                     header_buffer.push_back((value >> 24) & 0xFF);
                 };
                 auto magic = header->xpress_magic();
-
                 header_buffer.insert(header_buffer.end(), magic.begin(), magic.end());
-
-                // std::copy(header->xpress_magic().begin(), header->xpress_magic().end(), std::back_inserter(header_buffer));
-
-                // header_buffer.push_back(header->orig_size());
                 write_uint32(header->orig_size());
                 write_uint32(header->encoded_size());
-
                 auto huff = header->_raw_huffman_table_flags();
-
                 header_buffer.insert(header_buffer.end(), huff.begin(), huff.end());
-                // std::copy(header->_raw_huffman_table_flags().begin(), header->_raw_huffman_table_flags().end(), std::back_inserter(header_buffer));
                 write_uint32(header->zero());
                 write_uint32(header->session_signature());
                 write_uint32(block_index_iterator);
-
-                std::cout << std::hex << std::showbase<< std::uppercase;
-
-                std::cout << "block_index_iterator: " << block_index_iterator << std::endl;
-                std::cout << "header->block_index(): " << header->block_index() << std::endl;
-                std::cout << "header->crc32(): " << header->crc32() << std::endl;
                 auto crc32 = crc32c::Crc32c(header_buffer.data(), header_buffer.size());
                 write_uint32(crc32);
-                std::cout << "crc32: " << crc32 << std::endl;
-                std::cout << "header " << header << std::endl;
-                // std::cout << "header_buffer " << header_buffer << std::endl;
                 auto segments = chunk->node()->segments();
 
                 header_buffer.insert(header_buffer.end(), segments.begin(), segments.end());
-                // std::copy(chunk->node()->segments().begin(), chunk->node()->segments().end(), std::back_inserter(header_buffer));
-
                 compressedData =  std::vector<unsigned char>(header_buffer.begin(), header_buffer.end());    
             } else {
                 auto node = chunk->_raw_node();
@@ -119,10 +101,8 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
             // Buffers for storing decompressed data
             std::vector<uint8_t> x9DecompressedBuffer(chunk->uncompressed());
 
-
             // Decompress the entire data
             uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(compressedData.data(), chunk->compressed(), x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
-
             // Verify that the total decompressed size matches the expected size
             if (totalDecompressedSize != chunk->uncompressed()) {
                 throw std::runtime_error("Decompressed size does not match expected size.");
@@ -141,24 +121,30 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path) {
                 parsed_backup_log_header = true;
             }
             
-            if(abf_currsor + totalDecompressedSize >= virtual_directory_offset + virtual_directory_size){
-                std::vector<uint8_t> virtual_directory_buffer = read_buffer_bytes(allDecompressedData, virtual_directory_offset, virtual_directory_size);
+            if(abf_currsor + allDecompressedData.size() >= virtual_directory_offset + virtual_directory_size){
+
+                std::string buffer_str(allDecompressedData.begin(), allDecompressedData.end());
+
+                std::vector<uint8_t> virtual_directory_buffer = read_buffer_bytes(allDecompressedData, virtual_directory_offset-abf_currsor, virtual_directory_size);
                 VirtualDirectory virtual_directory = VirtualDirectory::from_xml(virtual_directory_buffer, "UTF-8");
+
 
                 BackupFile log = virtual_directory.backupFiles->back();
                 int backup_file_offset = static_cast<int>(log.m_cbOffsetHeader);
                 int backup_file_size = static_cast<int>(log.Size);
-                std::vector<uint8_t> backup_log_buffer = read_buffer_bytes(allDecompressedData, backup_file_offset+2, backup_file_size-2);
+
+                std::vector<uint8_t> backup_log_buffer = read_buffer_bytes(allDecompressedData, backup_file_offset+2-abf_currsor, backup_file_size-2);
                 BackupLog backup_log = BackupLog::from_xml(backup_log_buffer, "UTF-16");
 
                 auto sqlite = (*virtual_directory.backupFiles)[static_cast<int>(virtual_directory.backupFiles->size()) - 2];
                 int sqlite_offset = static_cast<int>(sqlite.m_cbOffsetHeader);
                 int sqlite_size = static_cast<int>(sqlite.Size);
-                std::vector<uint8_t> sqlite_buffer = read_buffer_bytes(allDecompressedData, sqlite_offset, sqlite_size);
+
+                std::vector<uint8_t> sqlite_buffer = read_buffer_bytes(allDecompressedData, sqlite_offset-abf_currsor, sqlite_size);
 
                 return sqlite_buffer;
             }
-            abf_currsor += chunk->uncompressed();
+            
         }
 
     }
