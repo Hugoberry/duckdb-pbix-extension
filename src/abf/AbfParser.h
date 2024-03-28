@@ -27,8 +27,8 @@ public:
 private:
     static std::vector<uint8_t> process_chunk(const pbix_t::chunk_t* chunk, uint32_t block_index, uint32_t& block_index_iterator);
     static std::vector<uint8_t> patch_header(const pbix_t::chunk_t* chunk, uint32_t& block_index_iterator);
-    static std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, long offset, int size);
+    static std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, uint64_t offset, int size);
     static std::vector<uint8_t> trim_buffer(const std::vector<uint8_t>& buffer);
-    static std::tuple<int,int> process_backup_log_header(const std::vector<uint8_t> &buffer);
-    static std::vector<uint8_t> extract_sqlite_buffer(const std::vector<uint8_t> &buffer, int skip_offset, int virtual_directory_offset, int virtual_directory_size);
+    static std::tuple<uint64_t,int> process_backup_log_header(const std::vector<uint8_t> &buffer);
+    static std::vector<uint8_t> extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size);
 };
