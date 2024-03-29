@@ -22,7 +22,7 @@
 
 class AbfParser {
 public:
-    static std::vector<uint8_t> get_sqlite(const std::string &path);
+    static std::vector<uint8_t> get_sqlite(const std::string &path, const int trailing_chunks);
     static std::vector<uint8_t> decompress_datamodel(pbix_t::abf_x9_t* datamodel);
 private:
     static std::vector<uint8_t> process_chunk(const pbix_t::chunk_t* chunk, uint32_t block_index, uint32_t& block_index_iterator);

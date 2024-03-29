@@ -48,10 +48,10 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 };
 
 
-static SQLiteDB ExtractDB(ClientContext &context, const string &path) {
+static SQLiteDB ExtractDB(ClientContext &context, const string &path, int trailing_chunks) {
 
 	SQLiteOpenOptions options;
-	auto sqliteBuffer = AbfParser::get_sqlite(path);
+	auto sqliteBuffer = AbfParser::get_sqlite(path, trailing_chunks);
 	return SQLiteDB::OpenFromBuffer(path, options, sqliteBuffer);
 
 }
@@ -128,13 +128,19 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 	auto result = make_uniq<PbixBindData>();
 	result->file_name = input.inputs[0].GetValue<string>();
 	result->table_name = input.inputs[1].GetValue<string>();
+	result->trailing_chunks = 15; //Empirically proven to be a good value
+	Value pbix_magic_number;
+
+	if (context.TryGetCurrentSetting("pbix_magic_number", pbix_magic_number)) {
+			result->trailing_chunks = IntegerValue::Get(pbix_magic_number);
+	}
 
 	SQLiteDB db;
 	SQLiteStatement stmt;
 	SQLiteOpenOptions options;
 	options.access_mode = AccessMode::READ_ONLY;
 	// db = SQLiteDB::Open(result->file_name, options);
-	db = ExtractDB(context, result->file_name);
+	db = ExtractDB(context, result->file_name, result->trailing_chunks);
 
 	// std::cout << "Opened SQLite database" << std::endl;
 	
@@ -174,7 +180,14 @@ static void PbixInitInternal(ClientContext &context, const PbixBindData &bind_da
 	if (!local_state.db) {
 		SQLiteOpenOptions options;
 		options.access_mode = AccessMode::READ_ONLY;
-		local_state.owned_db = ExtractDB(context, bind_data.file_name.c_str());
+		int trailing_chunks = 15;
+		Value pbix_magic_number;
+
+		if (context.TryGetCurrentSetting("pbix_magic_number", pbix_magic_number)) {
+				trailing_chunks = IntegerValue::Get(pbix_magic_number);
+		}
+
+		local_state.owned_db = ExtractDB(context, bind_data.file_name.c_str(),trailing_chunks);
 
 		// local_state.owned_db = SQLiteDB::Open(bind_data.file_name.c_str(), options);
 		local_state.db = &local_state.owned_db;

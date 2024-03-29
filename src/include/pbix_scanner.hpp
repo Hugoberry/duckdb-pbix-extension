@@ -10,6 +10,7 @@ namespace duckdb
 	{
 		string file_name;
 		string table_name;
+		int8_t trailing_chunks;
 
 		vector<string> names;
 		vector<LogicalType> types;

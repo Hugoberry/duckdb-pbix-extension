@@ -119,10 +119,8 @@ std::vector<uint8_t> AbfParser::extract_sqlite_buffer(const std::vector<uint8_t>
     return read_buffer_bytes(buffer, sqlite_offset - skip_offset, sqlite_size);
 }
 
-std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path)
+std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path, const int trailing_chunks=15)
 {
-
-    constexpr int trailing_chunks = 15;
     constexpr auto DataModelFileName = "DataModel";
     constexpr uint32_t LocalFileType = 1027;
 

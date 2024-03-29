@@ -19,6 +19,8 @@ extern "C"
     {
         PbixScanFunction pbix_fun;
         ExtensionUtil::RegisterFunction(db, pbix_fun);
+        auto &config = DBConfig::GetConfig(db);
+	    config.AddExtensionOption("pbix_magic_number", "A magic number to accelerate file parsing", LogicalType::INTEGER);
     }
 
     void PbixExtension::Load(DuckDB &db)
