@@ -53,7 +53,6 @@ set(EXTENSION_SOURCES
     src/sqlite_db.cpp 
     src/sqlite_stmt.cpp
     src/sqlite_utils.cpp
-    src/tinyxml2.cpp
     src/xpress9/Xpress9DecHuffman.c
     src/xpress9/Xpress9DecLz77.c
     src/xpress9/Xpress9Misc.c
