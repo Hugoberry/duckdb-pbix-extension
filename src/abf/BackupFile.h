@@ -11,7 +11,7 @@ class BackupFile {
 public:
     std::optional<std::string> Path;
     int Size;
-    int m_cbOffsetHeader;
+    uint64_t m_cbOffsetHeader;
     bool Delete;
     int64_t CreatedTimestamp;
     int64_t Access;

@@ -16,7 +16,7 @@ BackupFile BackupFile::from_value(tinyxml2::XMLElement& element, const std::stri
     }
     XMLElement* offsetHeaderElement = element.FirstChildElement("m_cbOffsetHeader");
     if (offsetHeaderElement && offsetHeaderElement->GetText()) {
-        file.m_cbOffsetHeader = std::stoi(offsetHeaderElement->GetText());
+        file.m_cbOffsetHeader = std::stoull(offsetHeaderElement->GetText());
     }
     XMLElement* deleteElement = element.FirstChildElement("Delete");
     if (deleteElement && deleteElement->GetText()) {

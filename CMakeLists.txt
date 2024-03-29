@@ -13,12 +13,9 @@ find_package(tinyxml2 REQUIRED)
 find_package(unofficial-sqlite3 REQUIRED)
 find_package(Crc32c REQUIRED)
 # find_package(kaitai-struct-cpp-stl-runtime REQUIRED)
-if(NOT Crc32c_FOUND)
-    message(FATAL_ERROR "Crc32c not found")
-endif()
+
 
 find_package(Threads REQUIRED)
-
 
 
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
