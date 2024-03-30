@@ -32,19 +32,12 @@ std::tuple<uint64_t,int> AbfParser::process_backup_log_header(const std::vector<
 
     std::vector<uint8_t> backup_log_header_buffer = read_buffer_bytes(buffer, backup_log_header_offset, backup_log_header_size);
     backup_log_header_buffer = trim_buffer(backup_log_header_buffer);
-    std::cout << "Backup log header: " << std::string(backup_log_header_buffer.begin(), backup_log_header_buffer.end()) << std::endl;
     BackupLogHeader backup_log_header = BackupLogHeader::from_xml(backup_log_header_buffer, "UTF-16");
     return {backup_log_header.m_cbOffsetHeader, backup_log_header.DataSize};
 }
 
 std::vector<uint8_t> AbfParser::extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size)
 {
-    std::cout << "Extracting SQLite buffer..." << std::endl;
-    std::cout << "Skip offset: " << skip_offset << std::endl;
-    std::cout << "Virtual directory offset: " << virtual_directory_offset << std::endl;
-    std::cout << "Virtual directory size: " << virtual_directory_size << std::endl;
-    // std::cout << "Backup log header: " << std::string(buffer.begin(), buffer.end()+200) << std::endl;
-    
     std::vector<uint8_t> virtual_directory_buffer = read_buffer_bytes(buffer, virtual_directory_offset - skip_offset, virtual_directory_size);
     VirtualDirectory virtual_directory = VirtualDirectory::from_xml(virtual_directory_buffer, "UTF-8");
 
@@ -161,7 +154,6 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path, const int tr
     std::tie(virtual_directory_offset, virtual_directory_size) = process_backup_log_header(all_decompressed_buffer);
 
     auto total_chunks = (virtual_directory_size + virtual_directory_offset) / 0x200000;
-    skip_offset += uncompressed_size;
 
     while(entryStream.tellg()<datamodel_ofs+datamodel_size)
     {
@@ -178,7 +170,7 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path, const int tr
         // Buffers for storing decompressed data
         std::vector<uint8_t> decompressed_buffer(uncompressed_size);
         std::vector<uint8_t> compressed_buffer(compressed_size);
-        std::cout << "Block index: " << block_index << std::endl;
+
         entryStream.read(reinterpret_cast<char*>(compressed_buffer.data()), compressed_size);
         // call to a new function process header_buffer which we'll use to modify compressed_buffer
         patch_header_of_compressed_buffer(compressed_buffer, block_index_iterator);
