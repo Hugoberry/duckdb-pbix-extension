@@ -14,21 +14,68 @@
 #include <crc32c/crc32c.h>
 
 #include <fstream>
-#include "../kaitai/kaitaistream.h"
-#include "pbix.h"
 #include <sstream>
+#include "miniz.h"
 
 #include "Xpress9Wrapper.h"
 
 class AbfParser {
 public:
     static std::vector<uint8_t> get_sqlite(const std::string &path, const int trailing_chunks);
-    static std::vector<uint8_t> decompress_datamodel(pbix_t::abf_x9_t* datamodel);
 private:
-    static std::vector<uint8_t> process_chunk(const pbix_t::chunk_t* chunk, uint32_t block_index, uint32_t& block_index_iterator);
-    static std::vector<uint8_t> patch_header(const pbix_t::chunk_t* chunk, uint32_t& block_index_iterator);
+    static void patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t& block_index_iterator);
     static std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, uint64_t offset, int size);
     static std::vector<uint8_t> trim_buffer(const std::vector<uint8_t>& buffer);
     static std::tuple<uint64_t,int> process_backup_log_header(const std::vector<uint8_t> &buffer);
     static std::vector<uint8_t> extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size);
+};
+
+class Header {
+public:
+    uint32_t xpress_magic;
+    uint32_t orig_size;
+    uint32_t encoded_size;
+    uint32_t huffman_table_flags;
+    uint32_t zero;
+    uint32_t session_signature;
+    uint32_t block_index;
+    uint32_t crc32;
+
+    Header() : xpress_magic(0), orig_size(0), encoded_size(0),
+               huffman_table_flags(0), zero(0), session_signature(0),
+               block_index(0), crc32(0) {}
+
+    // Calculate and update the CRC32C for the header
+    void update_crc() {
+        // Calculate CRC over the header except the crc32 field itself
+        crc32 = crc32c::Crc32c(reinterpret_cast<const uint8_t*>(this), sizeof(Header) - sizeof(crc32));
+    }
+
+    // Serialize this header to a binary stream
+    void serialize(std::ostream& os) const {
+        os.write(reinterpret_cast<const char*>(this), sizeof(Header) - sizeof(crc32));
+        uint32_t crc = crc32; // Use the current crc32 value
+        os.write(reinterpret_cast<const char*>(&crc), sizeof(crc));
+    }
+
+    // Deserialize this header from a binary stream
+    void deserialize(std::istream& is) {
+        is.read(reinterpret_cast<char*>(this), sizeof(Header));
+    }
+
+    // Extract this header from a larger binary buffer
+    static Header extract_from_buffer(const std::vector<uint8_t>& buffer, size_t offset) {
+        Header header;
+        if (offset + sizeof(Header) <= buffer.size()) {
+            std::memcpy(&header, buffer.data() + offset, sizeof(Header));
+        }
+        return header;
+    }
+
+    // Insert this header back into a larger buffer
+    void insert_into_buffer(std::vector<uint8_t>& buffer, size_t offset) const {
+        if (offset + sizeof(Header) <= buffer.size()) {
+            std::memcpy(buffer.data() + offset, this, sizeof(Header));
+        }
+    }
 };

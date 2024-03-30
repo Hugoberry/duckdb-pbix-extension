@@ -25,59 +25,6 @@ std::vector<uint8_t> AbfParser::trim_buffer(const std::vector<uint8_t> &buffer)
 }
 
 
-std::vector<uint8_t> AbfParser::patch_header(const pbix_t::chunk_t* chunk, uint32_t& block_index_iterator) {
-
-    // Increment the block index iterator as part of the patching process
-    block_index_iterator++;
-
-    // Extract the header from the chunk, ensuring non-null pointers
-    auto header = chunk->node()->header();
-    if (header == nullptr) {
-        throw std::runtime_error("Chunk's node header is null");
-    }
-
-    auto magic = header->xpress_magic();
-    std::vector<uint8_t> header_buffer(magic.begin(), magic.end());
-    // Serialize it back to a buffer
-    // UInt32 serialization routine
-    auto write_uint32 = [&header_buffer](uint32_t value) {
-        for (int i = 0; i < 4; ++i) {
-            header_buffer.push_back((value >> (i * 8)) & 0xFF);
-        }
-    };
-    // Serialize header fields into the buffer
-    write_uint32(header->orig_size());
-    write_uint32(header->encoded_size());
-
-    // Insert Huffman table flags and other header components
-    auto huff = header->_raw_huffman_table_flags();
-    header_buffer.insert(header_buffer.end(), huff.begin(), huff.end());
-    
-    write_uint32(header->zero());
-    write_uint32(header->session_signature());
-    write_uint32(block_index_iterator);
-
-    auto crc32 = crc32c::Crc32c(header_buffer.data(), header_buffer.size());
-    write_uint32(crc32);
-
-    // Append the segment data
-    const auto& segments = chunk->node()->segments();
-    header_buffer.insert(header_buffer.end(), segments.begin(), segments.end());
-
-    return std::vector<uint8_t>(header_buffer.begin(), header_buffer.end());
-}
-
-std::vector<uint8_t> AbfParser::process_chunk(const pbix_t::chunk_t* chunk, uint32_t block_index, uint32_t& block_index_iterator) {
-    if (block_index != block_index_iterator)
-    {
-        // Patch the header with a new block index
-        return patch_header(chunk, block_index_iterator);
-    }
-    const auto& node = chunk->_raw_node();
-    return std::vector<unsigned char>(node.begin(), node.end());
-
-}
-
 std::tuple<uint64_t,int> AbfParser::process_backup_log_header(const std::vector<uint8_t> &buffer)
 {
     constexpr int backup_log_header_offset = 72;
@@ -85,13 +32,19 @@ std::tuple<uint64_t,int> AbfParser::process_backup_log_header(const std::vector<
 
     std::vector<uint8_t> backup_log_header_buffer = read_buffer_bytes(buffer, backup_log_header_offset, backup_log_header_size);
     backup_log_header_buffer = trim_buffer(backup_log_header_buffer);
+    std::cout << "Backup log header: " << std::string(backup_log_header_buffer.begin(), backup_log_header_buffer.end()) << std::endl;
     BackupLogHeader backup_log_header = BackupLogHeader::from_xml(backup_log_header_buffer, "UTF-16");
     return {backup_log_header.m_cbOffsetHeader, backup_log_header.DataSize};
 }
 
 std::vector<uint8_t> AbfParser::extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size)
 {
-    std::string buffer_str(buffer.begin(), buffer.end());
+    std::cout << "Extracting SQLite buffer..." << std::endl;
+    std::cout << "Skip offset: " << skip_offset << std::endl;
+    std::cout << "Virtual directory offset: " << virtual_directory_offset << std::endl;
+    std::cout << "Virtual directory size: " << virtual_directory_size << std::endl;
+    // std::cout << "Backup log header: " << std::string(buffer.begin(), buffer.end()+200) << std::endl;
+    
     std::vector<uint8_t> virtual_directory_buffer = read_buffer_bytes(buffer, virtual_directory_offset - skip_offset, virtual_directory_size);
     VirtualDirectory virtual_directory = VirtualDirectory::from_xml(virtual_directory_buffer, "UTF-8");
 
@@ -119,6 +72,17 @@ std::vector<uint8_t> AbfParser::extract_sqlite_buffer(const std::vector<uint8_t>
     return read_buffer_bytes(buffer, sqlite_offset - skip_offset, sqlite_size);
 }
 
+void AbfParser::patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t& block_index_iterator)
+{
+    block_index_iterator++;
+
+    Header header = Header::extract_from_buffer(compressed_buffer, 0);
+    header.block_index = block_index_iterator;
+    header.update_crc();
+    header.insert_into_buffer(compressed_buffer, 0);
+
+}
+
 std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path, const int trailing_chunks=15)
 {
     constexpr auto DataModelFileName = "DataModel";
@@ -128,72 +92,109 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path, const int tr
     int virtual_directory_size = 0;
     uint64_t skip_offset = 0;
     uint32_t block_index_iterator = 0;
+    uint32_t block_index = 0;
 
-    std::ifstream is_pbix(path, std::ifstream::binary);
-    if (!is_pbix.is_open())
-    {
-        throw std::runtime_error("Failed to open PBIX file");
+    mz_zip_archive zip_archive;
+    uint64_t datamodel_ofs = 0;
+    uint64_t datamodel_size = 0;
+    memset(&zip_archive, 0, sizeof(zip_archive));
+    mz_bool status = mz_zip_reader_init_file(&zip_archive, path.c_str(), 0);
+    if (!status) {
+        throw std::runtime_error("Could not open pbix file");
     }
-    kaitai::kstream ks_pbix(&is_pbix);
-    pbix_t zip_archive(&ks_pbix);
+    int file_index = mz_zip_reader_locate_file(&zip_archive, DataModelFileName, NULL, 0);
+    if (file_index < 0) {
+        throw std::runtime_error("DataModel not found in the pbix file.");
+    } else {
+        mz_zip_archive_file_stat file_stat;
+        if (mz_zip_reader_file_stat(&zip_archive, file_index, &file_stat)) {
+            datamodel_size=  file_stat.m_comp_size;
+            datamodel_ofs = file_stat.m_local_header_ofs;
 
-    // Loop through each section in the ZIP file
-    for (const auto& section : *zip_archive.sections())
-    {
-        if (section->section_type() != LocalFileType) continue;
-
-        auto localFile = static_cast<pbix_t::local_file_t *>(section->body());
-        if (localFile->header()->file_name() != DataModelFileName) continue;
-
-        //initialize the decompressed data buffer and the XPress9Wrapper
-        XPress9Wrapper xpress9_wrapper;
-        if (!xpress9_wrapper.Initialize())
-        {
-            throw std::runtime_error("Failed to initialize XPress9Wrapper");
-        }
-        //used to asses if we need to skip chunks as it's a big file
-        auto total_chunks = localFile->datamodel()->chunks()->size();
-        std::vector<uint8_t> all_decompressed_data;
-
-        for (const auto& chunk : *localFile->datamodel()->chunks())
-        {
-
-            
-            int block_index = chunk->node()->header()->block_index();
-            if (total_chunks > trailing_chunks && !(block_index == 0 || block_index >= total_chunks - trailing_chunks))
-            {
-                skip_offset += chunk->uncompressed();
-                continue;
-            }
-
-            std::vector<uint8_t> compressed_data = process_chunk(chunk, block_index, block_index_iterator); // Process chunks.
-
-            // Buffers for storing decompressed data
-            std::vector<uint8_t> decompressed_buffer(chunk->uncompressed());
-
-            // Decompress the entire data
-            uint32_t decompressed_size = xpress9_wrapper.Decompress(compressed_data.data(), chunk->compressed(), decompressed_buffer.data(), decompressed_buffer.size());
-            
-            // Verify that the total decompressed size matches the expected size
-            if (decompressed_size != chunk->uncompressed()) {
-                throw std::runtime_error("Mismatch in decompressed chunk size.");
-            }
-            
-            // Add the decompressed data to the overall buffer
-            all_decompressed_data.insert(all_decompressed_data.end(), decompressed_buffer.begin(), decompressed_buffer.end());
-            
-            uint64_t virtual_directory_offset;
-            int virtual_directory_size;
-            if (block_index == 0) {
-                std::tie(virtual_directory_offset, virtual_directory_size) = process_backup_log_header(all_decompressed_data); // Processes the backup log header.
-            }
-
-            if (skip_offset + all_decompressed_data.size() >= virtual_directory_offset + virtual_directory_size)
-            {
-
-                return extract_sqlite_buffer(all_decompressed_data, skip_offset, virtual_directory_offset, virtual_directory_size); // Extracts and returns the SQLite buffer.
-            }
+        } else {
+            throw std::runtime_error("Could not retrieve information about DataModel.");
         }
     }
+    mz_zip_reader_end(&zip_archive);
+    std::ifstream entryStream(path, std::ios::binary);
+    if (!entryStream.is_open()) {
+        throw std::runtime_error("Could not open pbix file");
+    }
+    entryStream.seekg(datamodel_ofs+26);
+    uint16_t filename_len = 0;
+    uint16_t extra_len = 0;
+    entryStream.read(reinterpret_cast<char *>(&filename_len), sizeof(filename_len));
+    entryStream.read(reinterpret_cast<char *>(&extra_len), sizeof(extra_len));
+
+    datamodel_ofs += 30+filename_len+extra_len;
+    entryStream.seekg(datamodel_ofs+102);
+
+    uint32_t uncompressed_size;
+    uint32_t compressed_size;
+
+    //process the first chunk
+    // Read the compressed and uncompressed sizes before the offset
+    entryStream.read(reinterpret_cast<char*>(&uncompressed_size), sizeof(uint32_t));
+    entryStream.read(reinterpret_cast<char*>(&compressed_size), sizeof(uint32_t));
+
+    XPress9Wrapper xpress9_wrapper;
+    if (!xpress9_wrapper.Initialize())
+    {
+        throw std::runtime_error("Failed to initialize XPress9Wrapper");
+    }
+
+    // Buffers for storing decompressed data
+    std::vector<uint8_t> c0_decompressed_buffer(uncompressed_size);
+    std::vector<uint8_t> c0_compressed_buffer(compressed_size);
+    std::vector<uint8_t> all_decompressed_buffer;
+
+    entryStream.read(reinterpret_cast<char*>(c0_compressed_buffer.data()), compressed_size);
+
+    // Decompress the entire data
+    uint32_t decompressed_size = xpress9_wrapper.Decompress(c0_compressed_buffer.data(), compressed_size, c0_decompressed_buffer.data(), c0_decompressed_buffer.size());
+    // Verify that the total decompressed size matches the expected size
+    if (decompressed_size != uncompressed_size) {
+        throw std::runtime_error("Mismatch in decompressed chunk size in first chunk.");
+    }
+    all_decompressed_buffer.insert(all_decompressed_buffer.end(), c0_decompressed_buffer.begin(), c0_decompressed_buffer.end()); // Add the decompressed data to the overall buffer
+
+    std::tie(virtual_directory_offset, virtual_directory_size) = process_backup_log_header(all_decompressed_buffer);
+
+    auto total_chunks = (virtual_directory_size + virtual_directory_offset) / 0x200000;
+    skip_offset += uncompressed_size;
+
+    while(entryStream.tellg()<datamodel_ofs+datamodel_size)
+    {
+        block_index++;
+        // Read the compressed and uncompressed sizes before the offset
+        entryStream.read(reinterpret_cast<char*>(&uncompressed_size), sizeof(uint32_t));
+        entryStream.read(reinterpret_cast<char*>(&compressed_size), sizeof(uint32_t));
+        if (total_chunks > trailing_chunks && !(block_index >= total_chunks - trailing_chunks))
+        {
+            skip_offset += uncompressed_size;
+            entryStream.seekg(compressed_size, std::ios::cur);
+            continue;
+        }
+        // Buffers for storing decompressed data
+        std::vector<uint8_t> decompressed_buffer(uncompressed_size);
+        std::vector<uint8_t> compressed_buffer(compressed_size);
+        std::cout << "Block index: " << block_index << std::endl;
+        entryStream.read(reinterpret_cast<char*>(compressed_buffer.data()), compressed_size);
+        // call to a new function process header_buffer which we'll use to modify compressed_buffer
+        patch_header_of_compressed_buffer(compressed_buffer, block_index_iterator);
+
+        decompressed_size = xpress9_wrapper.Decompress(compressed_buffer.data(), compressed_size, decompressed_buffer.data(), decompressed_buffer.size());
+        // Verify that the total decompressed size matches the expected size
+        if (decompressed_size != uncompressed_size) {
+            throw std::runtime_error("Mismatch in decompressed chunk size.");
+        }
+        all_decompressed_buffer.insert(all_decompressed_buffer.end(), decompressed_buffer.begin(), decompressed_buffer.end()); // Add the decompressed data to the overall buffer
+
+        if (skip_offset + all_decompressed_buffer.size() >= virtual_directory_offset + virtual_directory_size)
+        {
+            return extract_sqlite_buffer(all_decompressed_buffer, skip_offset, virtual_directory_offset, virtual_directory_size); // Extracts and returns the SQLite buffer.
+        }
+    }
+
     throw std::runtime_error("DataModel metadata not found in PBIX file.");
 }
