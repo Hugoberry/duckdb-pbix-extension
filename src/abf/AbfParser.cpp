@@ -81,8 +81,8 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path, const int tr
     constexpr auto DataModelFileName = "DataModel";
     constexpr uint32_t LocalFileType = 1027;
 
-    int virtual_directory_offset = 0;
-    int virtual_directory_size = 0;
+    uint64_t virtual_directory_offset = 0;
+    uint32_t virtual_directory_size = 0;
     uint64_t skip_offset = 0;
     uint32_t block_index_iterator = 0;
     uint32_t block_index = 0;
