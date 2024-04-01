@@ -29,9 +29,7 @@ include_directories(src/include)
 include_directories(src/kaitai)
 include_directories(src/xpress9)
 include_directories(src/abf)
-# include_directories(src/third_party/tinyxml2)
 
-# add_subdirectory(src)
 set(EXTENSION_SOURCES 
     src/abf/AbfParser.cpp
     src/abf/BackupFile.cpp
@@ -61,18 +59,23 @@ build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
+# Right after defining and linking libraries to ${EXTENSION_NAME}
 target_link_libraries(${EXTENSION_NAME} tinyxml2::tinyxml2)
-target_link_libraries(${LOADABLE_EXTENSION_NAME} tinyxml2::tinyxml2)
 target_link_libraries(${EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
-target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${EXTENSION_NAME} Crc32c::crc32c)
-target_link_libraries(${LOADABLE_EXTENSION_NAME} Crc32c::crc32c)
 target_link_libraries(${EXTENSION_NAME}  Threads::Threads)
-target_link_libraries(${LOADABLE_EXTENSION_NAME}  Threads::Threads)
-# target_link_libraries(${EXTENSION_NAME} kaitai::kaitai_struct_cpp_stl_runtime)
-# target_link_libraries(${LOADABLE_EXTENSION_NAME} kaitai::kaitai_struct_cpp_stl_runtime)
 target_link_libraries(${EXTENSION_NAME}  miniz::miniz)
+# Add the include directories here
+target_include_directories(${EXTENSION_NAME} PRIVATE ${tinyxml2_INCLUDE_DIRS})
+
+# And similarly for ${LOADABLE_EXTENSION_NAME}
+target_link_libraries(${LOADABLE_EXTENSION_NAME} tinyxml2::tinyxml2)
+target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
+target_link_libraries(${LOADABLE_EXTENSION_NAME} Crc32c::crc32c)
+target_link_libraries(${LOADABLE_EXTENSION_NAME}  Threads::Threads)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  miniz::miniz)
+# Add the include directories here
+target_include_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${tinyxml2_INCLUDE_DIRS})
 
 
 install(
