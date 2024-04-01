@@ -28,6 +28,10 @@ private:
     static std::vector<uint8_t> trim_buffer(const std::vector<uint8_t>& buffer);
     static std::tuple<uint64_t,int> process_backup_log_header(const std::vector<uint8_t> &buffer);
     static std::vector<uint8_t> extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size);
+    static std::pair<uint64_t, uint64_t> initialize_zip_and_locate_datamodel(const std::string &path);
+    static void read_compressed_datamodel_header(std::ifstream &entryStream, uint64_t &datamodel_ofs);
+    static std::vector<uint8_t> decompress_initial_block(std::ifstream &entryStream, uint64_t datamodel_ofs, XPress9Wrapper &xpress9_wrapper);
+    static std::vector<uint8_t> iterate_and_decompress_blocks(std::ifstream &entryStream, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, uint64_t virtual_directory_offset, int virtual_directory_size, const int trailing_blocks, uint64_t &skip_offset);
 };
 
 class Header {
