@@ -147,21 +147,3 @@ exit:
 
 }
 
-// Global instance of the XPress9Wrapper class
-XPress9Wrapper gWrapper;
-
-extern "C" {
-
-XPRESS9WRAPPERLIB_API BOOL Initialize() {
-    return gWrapper.Initialize();
-}
-
-XPRESS9WRAPPERLIB_API VOID Terminate() {
-    gWrapper.Terminate();
-}
-
-XPRESS9WRAPPERLIB_API UINT Decompress(BYTE * compressed, INT compressedSize, BYTE * original, INT maxOriginalSize) {
-    return gWrapper.Decompress(compressed, compressedSize, original, maxOriginalSize);
-}
-
-}
