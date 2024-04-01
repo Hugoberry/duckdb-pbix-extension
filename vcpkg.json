@@ -4,7 +4,6 @@
     "tinyxml2",
     "sqlite3",
     "miniz",
-    "kaitai-struct-cpp-stl-runtime",
     "crc32c"
   ]
 }
