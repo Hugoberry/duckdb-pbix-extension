@@ -14,29 +14,10 @@ using VOID = void;
 
 #define UNREFERENCED_PARAMETER(P) (void)(P)
 
-#if defined(_MSC_VER)  // Microsoft's Visual Studio compiler
-    #ifdef XPRESS9WRAPPERLIB_EXPORT
-        #define XPRESS9WRAPPERLIB_API __declspec(dllexport)
-    #else
-        #define XPRESS9WRAPPERLIB_API __declspec(dllimport)
-    #endif
-#else  // GCC, Clang, and others
-    #ifdef XPRESS9WRAPPERLIB_EXPORT
-        #define XPRESS9WRAPPERLIB_API __attribute__((visibility("default")))
-    #else
-        #define XPRESS9WRAPPERLIB_API
-    #endif
-#endif
-
-extern "C" {
-    XPRESS9WRAPPERLIB_API BOOL Initialize();
-    XPRESS9WRAPPERLIB_API VOID Terminate();
-    XPRESS9WRAPPERLIB_API UINT Decompress(BYTE * compressed, INT compressedSize, BYTE * original, INT maxOriginalSize);
-};
 //
 // Lightweight wrapper on top of XPress library. 
 //
-class XPRESS9WRAPPERLIB_API XPress9Wrapper
+class XPress9Wrapper
 {
 public:
 
