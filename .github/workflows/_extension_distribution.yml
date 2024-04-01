@@ -290,11 +290,6 @@ jobs:
           cd duckdb
           git checkout ${{ inputs.duckdb_version }}
 
-      - name: Setup Ccache
-        uses: hendrikmuhs/ccache-action@v1.2.11 # Note: pinned due to GLIBC incompatibility in later releases
-        with:
-          key: ${{ github.job }}-${{ matrix.duckdb_arch }}
-
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11.1
         with:
