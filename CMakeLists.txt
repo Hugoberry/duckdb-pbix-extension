@@ -12,8 +12,7 @@ find_package(OpenSSL REQUIRED)
 find_package(tinyxml2 REQUIRED)
 find_package(unofficial-sqlite3 REQUIRED)
 find_package(Crc32c REQUIRED)
-# find_package(kaitai-struct-cpp-stl-runtime REQUIRED)
-
+find_package(miniz REQUIRED)
 
 find_package(Threads REQUIRED)
 
@@ -45,9 +44,6 @@ set(EXTENSION_SOURCES
     src/abf/Languages.cpp
     src/abf/LogBackupFile.cpp
     src/abf/VirtualDirectory.cpp
-    src/kaitai/kaitaistream.cpp
-    src/abf/dos_datetime.cpp
-    src/abf/pbix.cpp
     src/pbix_extension.cpp
     src/pbix_scanner.cpp
     src/sqlite_db.cpp 
@@ -75,6 +71,8 @@ target_link_libraries(${EXTENSION_NAME}  Threads::Threads)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  Threads::Threads)
 # target_link_libraries(${EXTENSION_NAME} kaitai::kaitai_struct_cpp_stl_runtime)
 # target_link_libraries(${LOADABLE_EXTENSION_NAME} kaitai::kaitai_struct_cpp_stl_runtime)
+target_link_libraries(${EXTENSION_NAME}  miniz::miniz)
+target_link_libraries(${LOADABLE_EXTENSION_NAME}  miniz::miniz)
 
 
 install(
