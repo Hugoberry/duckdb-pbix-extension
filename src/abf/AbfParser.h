@@ -19,6 +19,13 @@
 
 #include "Xpress9Wrapper.h"
 
+// Constants related to ZIP file parsing
+constexpr unsigned char ZIP_LOCAL_FILE_HEADER_FIXED = 26;
+constexpr unsigned char ZIP_LOCAL_FILE_HEADER = 30;
+constexpr unsigned char ABF_XPRESS9_SIGNATRUE = 102;
+constexpr unsigned char ABF_BACKUP_LOG_HEADER_OFFSET = 72;
+constexpr unsigned short ABF_BACKUP_LOG_HEADER_SIZE = 0x1000 - ABF_BACKUP_LOG_HEADER_OFFSET;
+
 class AbfParser {
 public:
     static std::vector<uint8_t> get_sqlite(const std::string &path, const int trailing_chunks);

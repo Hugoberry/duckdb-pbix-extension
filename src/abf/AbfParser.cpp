@@ -27,10 +27,8 @@ std::vector<uint8_t> AbfParser::trim_buffer(const std::vector<uint8_t> &buffer)
 
 std::tuple<uint64_t,int> AbfParser::process_backup_log_header(const std::vector<uint8_t> &buffer)
 {
-    constexpr int backup_log_header_offset = 72;
-    constexpr int backup_log_header_size = 0x1000 - backup_log_header_offset;
 
-    std::vector<uint8_t> backup_log_header_buffer = read_buffer_bytes(buffer, backup_log_header_offset, backup_log_header_size);
+    std::vector<uint8_t> backup_log_header_buffer = read_buffer_bytes(buffer, ABF_BACKUP_LOG_HEADER_OFFSET, ABF_BACKUP_LOG_HEADER_SIZE);
     backup_log_header_buffer = trim_buffer(backup_log_header_buffer);
     BackupLogHeader backup_log_header = BackupLogHeader::from_xml(backup_log_header_buffer, "UTF-16");
     return {backup_log_header.m_cbOffsetHeader, backup_log_header.DataSize};
@@ -112,8 +110,6 @@ std::pair<uint64_t, uint64_t> AbfParser::initialize_zip_and_locate_datamodel(con
 }
 
 void AbfParser::read_compressed_datamodel_header(std::ifstream &entryStream, uint64_t &datamodel_ofs) {
-    constexpr u_short ZIP_LOCAL_FILE_HEADER_FIXED = 26;
-    constexpr u_short ZIP_LOCAL_FILE_HEADER = 30;
     // Read compressed DataModel header to adjust offset
     entryStream.seekg(datamodel_ofs+ZIP_LOCAL_FILE_HEADER_FIXED);
     uint16_t filename_len = 0;
@@ -125,7 +121,6 @@ void AbfParser::read_compressed_datamodel_header(std::ifstream &entryStream, uin
 }
 
 std::vector<uint8_t> AbfParser::decompress_initial_block(std::ifstream &entryStream, uint64_t datamodel_ofs, XPress9Wrapper &xpress9_wrapper) {
-    constexpr u_short ABF_XPRESS9_SIGNATRUE = 102;
     // Seek to the start of the DataModel compressed data
     entryStream.seekg(datamodel_ofs + ABF_XPRESS9_SIGNATRUE, std::ios::beg);
 
