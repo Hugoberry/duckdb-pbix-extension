@@ -5,7 +5,7 @@
 #include <vector>
 #include <optional>
 #include <string>
-#include <tinyxml2.h>
+#include "tinyxml2.h"
 
 class Collations {
 public:

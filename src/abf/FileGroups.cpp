@@ -1,7 +1,7 @@
 // FileGroups.cpp
 #include "FileGroups.h"
 #include "FileGroup.h"
-#include <tinyxml2.h>
+#include "tinyxml2.h"
 
 using namespace tinyxml2;
 
