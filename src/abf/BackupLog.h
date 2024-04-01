@@ -12,7 +12,7 @@
 #include "FileGroups.h"
 #include <codecvt>
 #include <locale>
-#include "tinyxml2.h"
+#include "../third_party/tinyxml2.h"
 
 class BackupLog {
 public:

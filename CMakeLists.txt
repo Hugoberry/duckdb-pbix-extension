@@ -9,7 +9,7 @@ set(TARGET_NAME pbix)
 # used in cmake with find_package. Feel free to remove or replace with other dependencies.
 # Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
 find_package(OpenSSL REQUIRED)
-find_package(tinyxml2 REQUIRED)
+# find_package(tinyxml2 REQUIRED)
 find_package(unofficial-sqlite3 REQUIRED)
 find_package(Crc32c REQUIRED)
 find_package(miniz REQUIRED)
@@ -29,6 +29,7 @@ include_directories(src/include)
 include_directories(src/kaitai)
 include_directories(src/xpress9)
 include_directories(src/abf)
+include_directories(src/third_party)
 
 set(EXTENSION_SOURCES 
     src/abf/AbfParser.cpp
@@ -60,22 +61,22 @@ target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
 # Right after defining and linking libraries to ${EXTENSION_NAME}
-target_link_libraries(${EXTENSION_NAME} tinyxml2::tinyxml2)
+# target_link_libraries(${EXTENSION_NAME} tinyxml2::tinyxml2)
 target_link_libraries(${EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${EXTENSION_NAME} Crc32c::crc32c)
 target_link_libraries(${EXTENSION_NAME}  Threads::Threads)
 target_link_libraries(${EXTENSION_NAME}  miniz::miniz)
 # Add the include directories here
-target_include_directories(${EXTENSION_NAME} PRIVATE ${tinyxml2_INCLUDE_DIRS})
+# target_include_directories(${EXTENSION_NAME} PRIVATE ${tinyxml2_INCLUDE_DIRS})
 
 # And similarly for ${LOADABLE_EXTENSION_NAME}
-target_link_libraries(${LOADABLE_EXTENSION_NAME} tinyxml2::tinyxml2)
+# target_link_libraries(${LOADABLE_EXTENSION_NAME} tinyxml2::tinyxml2)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} Crc32c::crc32c)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  Threads::Threads)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  miniz::miniz)
 # Add the include directories here
-target_include_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${tinyxml2_INCLUDE_DIRS})
+# target_include_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${tinyxml2_INCLUDE_DIRS})
 
 
 install(

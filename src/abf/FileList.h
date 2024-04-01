@@ -2,7 +2,7 @@
 
 #include <vector>
 #include "LogBackupFile.h"
-#include "tinyxml2.h"
+#include "../third_party/tinyxml2.h"
 
 class FileList {
 public:

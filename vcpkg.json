@@ -1,7 +1,6 @@
 {
   "dependencies": [
     "openssl",
-    "tinyxml2",
     "sqlite3",
     "miniz",
     "crc32c"

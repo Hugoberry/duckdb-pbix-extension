@@ -3,7 +3,7 @@
 #include <vector>
 #include <optional>
 #include "BackupFile.h"
-#include "tinyxml2.h"
+#include "../third_party/tinyxml2.h"
 // VirtualDirectory
 class VirtualDirectory {
 public:
