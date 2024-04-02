@@ -10,7 +10,7 @@ set(TARGET_NAME pbix)
 # Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
 # find_package(OpenSSL REQUIRED)
 # find_package(tinyxml2 REQUIRED)
-# find_package(unofficial-sqlite3 REQUIRED)
+find_package(unofficial-sqlite3 REQUIRED)
 find_package(Crc32c REQUIRED)
 find_package(miniz REQUIRED)
 
@@ -65,7 +65,7 @@ build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 
 # Right after defining and linking libraries to ${EXTENSION_NAME}
 # target_link_libraries(${EXTENSION_NAME} tinyxml2::tinyxml2)
-# target_link_libraries(${EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
+target_link_libraries(${EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${EXTENSION_NAME} Crc32c::crc32c)
 target_link_libraries(${EXTENSION_NAME}  Threads::Threads)
 target_link_libraries(${EXTENSION_NAME}  miniz::miniz)
@@ -74,7 +74,7 @@ target_link_libraries(${EXTENSION_NAME}  miniz::miniz)
 
 # And similarly for ${LOADABLE_EXTENSION_NAME}
 # target_link_libraries(${LOADABLE_EXTENSION_NAME} tinyxml2::tinyxml2)
-# target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
+target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} Crc32c::crc32c)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  Threads::Threads)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  miniz::miniz)
