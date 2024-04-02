@@ -9,7 +9,7 @@
 #pragma once
 
 #include "duckdb.hpp"
-#include <sqlite3.h>
+#include "../third_party/sqlite3.h"
 
 namespace duckdb {
 
