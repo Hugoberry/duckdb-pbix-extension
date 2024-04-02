@@ -1,7 +1,5 @@
 {
   "dependencies": [
-    "openssl",
-    "sqlite3",
     "miniz",
     "crc32c"
   ]

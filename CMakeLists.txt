@@ -8,9 +8,9 @@ set(TARGET_NAME pbix)
 # DuckDB's extension distribution supports vcpkg. As such, dependencies can be added in ./vcpkg.json and then
 # used in cmake with find_package. Feel free to remove or replace with other dependencies.
 # Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
-find_package(OpenSSL REQUIRED)
+# find_package(OpenSSL REQUIRED)
 # find_package(tinyxml2 REQUIRED)
-find_package(unofficial-sqlite3 REQUIRED)
+# find_package(unofficial-sqlite3 REQUIRED)
 find_package(Crc32c REQUIRED)
 find_package(miniz REQUIRED)
 
@@ -20,8 +20,8 @@ find_package(Threads REQUIRED)
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 
-set(STRING_ENCODING_TYPE "ICONV" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
-add_definitions(-DKS_STR_ENCODING_ICONV)
+# set(STRING_ENCODING_TYPE "ICONV" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
+# add_definitions(-DKS_STR_ENCODING_ICONV)
 
 
 project(${TARGET_NAME})
@@ -58,12 +58,12 @@ build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 
 # Link OpenSSL in both the static library as the loadable extension
-target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
-target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
+# target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
+# target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
 # Right after defining and linking libraries to ${EXTENSION_NAME}
 # target_link_libraries(${EXTENSION_NAME} tinyxml2::tinyxml2)
-target_link_libraries(${EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
+# target_link_libraries(${EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${EXTENSION_NAME} Crc32c::crc32c)
 target_link_libraries(${EXTENSION_NAME}  Threads::Threads)
 target_link_libraries(${EXTENSION_NAME}  miniz::miniz)
@@ -72,7 +72,7 @@ target_link_libraries(${EXTENSION_NAME}  miniz::miniz)
 
 # And similarly for ${LOADABLE_EXTENSION_NAME}
 # target_link_libraries(${LOADABLE_EXTENSION_NAME} tinyxml2::tinyxml2)
-target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
+# target_link_libraries(${LOADABLE_EXTENSION_NAME}  unofficial::sqlite3::sqlite3)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} Crc32c::crc32c)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  Threads::Threads)
 target_link_libraries(${LOADABLE_EXTENSION_NAME}  miniz::miniz)
