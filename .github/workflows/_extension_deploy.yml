@@ -18,6 +18,7 @@ on:
       duckdb_version:
         required: true
         type: string
+        default: "v0.10.1"
       # ';' separated list of architectures to exclude, for example: 'linux_amd64;osx_arm64'
       exclude_archs:
         required: false
