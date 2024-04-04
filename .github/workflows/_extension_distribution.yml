@@ -20,14 +20,12 @@ on:
       duckdb_version:
         required: true
         type: string
-        # default: "v0.10.1"
         # ';' separated list of architectures to exclude, for example: 'linux_amd64;osx_arm64'
       exclude_archs:
         required: false
         type: string
-        default: ""
+        default: "windows_amd64_rtools"
         # default: "linux_amd64;linux_amd64_gcc4;osx_arm64;wasm_mvp;wasm_eh;wasm_threads;linux_arm64;osx_amd64;windows_amd64_rtools"
-        # default: "windows_amd64;windows_amd64_rtools"
       # Postfix added to artifact names. Can be used to guarantee unique names when this workflow is called multiple times
       artifact_postfix:
         required: false
