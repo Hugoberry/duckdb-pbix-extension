@@ -2,7 +2,7 @@
 #define DUCKDB_BUILD_LOADABLE_EXTENSION
 #endif
 #include "duckdb.hpp"
-#include "../third_party/tinyxml2.h"
+#include "../../third_party/tinyxml2/tinyxml2.h"
 
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"

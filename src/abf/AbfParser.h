@@ -11,13 +11,12 @@
 #include "BackupFile.h"
 #include "BackupLog.h"
 
-#include <crc32c/crc32c.h>
-
 #include <fstream>
 #include <sstream>
 #include "miniz.h"
 
 #include "Xpress9Wrapper.h"
+#include "Crc32.h"
 
 // Constants related to ZIP file parsing
 constexpr unsigned char ZIP_LOCAL_FILE_HEADER_FIXED = 26;
@@ -59,7 +58,7 @@ public:
     // Calculate and update the CRC32C for the header
     void update_crc() {
         // Calculate CRC over the header except the crc32 field itself
-        crc32 = crc32c::Crc32c(reinterpret_cast<const uint8_t*>(this), sizeof(Header) - sizeof(crc32));
+        crc32 = Crc32(reinterpret_cast<const uint8_t*>(this), sizeof(Header) - sizeof(crc32),0);
     }
 
     // Serialize this header to a binary stream

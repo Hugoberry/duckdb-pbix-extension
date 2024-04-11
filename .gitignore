@@ -11,3 +11,4 @@ vcpkg_installed/
 data/DataModel_XL
 data/mark.pbix
 data/dash.pbix
+vcpkg/

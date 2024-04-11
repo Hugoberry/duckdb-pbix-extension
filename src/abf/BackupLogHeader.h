@@ -7,7 +7,7 @@
 #include <iostream>
 #include <codecvt>
 #include <locale>
-#include "../third_party/tinyxml2.h"
+#include "../../third_party/tinyxml2/tinyxml2.h"
 
 class BackupLogHeader {
 public:

@@ -4,7 +4,7 @@
 #include <string>
 #include <optional>
 #include "FileList.h"
-#include "../third_party/tinyxml2.h"
+#include "../../third_party/tinyxml2/tinyxml2.h"
 
 class FileGroup {
 public:

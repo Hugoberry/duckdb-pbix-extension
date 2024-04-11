@@ -1,7 +1,0 @@
-{
-  "dependencies": [
-    "sqlite3",
-    "miniz",
-    "crc32c"
-  ]
-}
