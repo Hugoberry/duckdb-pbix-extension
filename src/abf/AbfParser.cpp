@@ -1,5 +1,6 @@
 #include "AbfParser.h"
 
+
 using namespace tinyxml2;
 
 std::vector<uint8_t> AbfParser::read_buffer_bytes(const std::vector<uint8_t> &buffer, uint64_t offset, int size)
@@ -109,6 +110,28 @@ std::pair<uint64_t, uint64_t> AbfParser::initialize_zip_and_locate_datamodel(con
     return {file_stat.m_local_header_ofs, file_stat.m_comp_size};
 }
 
+std::pair<uint64_t, uint64_t> AbfParser::locate_datamodel(duckdb::ClientContext &context,const std::string &path) {
+    auto &fs = duckdb::FileSystem::GetFileSystem(context);
+    auto file_handle = fs.OpenFile(path, duckdb::FileFlags::FILE_FLAGS_READ);
+    duckdb::FileHandleStream file_stream(file_handle.get());
+
+    kaitai::kstream ks(&file_stream);
+
+    pbix_t pbix(&ks);
+
+    for(auto &section : *pbix.sections()) {
+        if (section->section_type() == 513) { //Central Directory
+            auto central_directory =  static_cast<pbix_t::central_dir_entry_t*>(section->body());
+            //check if the file is DataModel
+            if(central_directory->file_name() == "DataModel") {
+                return {central_directory->ofs_local_header(), central_directory->len_body_compressed()};
+            }
+        }
+    }
+    throw std::runtime_error("DataModel not found in the zip file.");
+
+}
+
 void AbfParser::read_compressed_datamodel_header(std::ifstream &entryStream, uint64_t &datamodel_ofs) {
     // Read compressed DataModel header to adjust offset
     entryStream.seekg(datamodel_ofs+ZIP_LOCAL_FILE_HEADER_FIXED);
@@ -199,6 +222,46 @@ std::vector<uint8_t> AbfParser::get_sqlite(const std::string &path, const int tr
 {
     // Initialize zip and locate DataModel
     auto [datamodel_ofs, datamodel_size]  = initialize_zip_and_locate_datamodel(path);
+
+    // Open file stream
+    std::ifstream entryStream(path, std::ios::binary);
+    if (!entryStream.is_open()) {
+        throw std::runtime_error("Could not open pbix file for reading compressed DataModel header.");
+    }
+
+    // Read compressed DataModel header to adjust offset
+    read_compressed_datamodel_header(entryStream, datamodel_ofs);
+    
+    XPress9Wrapper xpress9_wrapper;
+    if (!xpress9_wrapper.Initialize())
+    {
+        throw std::runtime_error("Failed to initialize XPress9Wrapper");
+    }
+
+    // Decompress initial block to get the virtual directory info
+    auto initial_decompressed_buffer = decompress_initial_block(entryStream, datamodel_ofs, xpress9_wrapper);
+
+    // Process backup log header to get virtual directory offset and size
+    auto [virtual_directory_offset, virtual_directory_size] = process_backup_log_header(initial_decompressed_buffer);
+
+    uint64_t skip_offset = 0; //optimization for skipping blocks
+    // Iterate through the remaining blocks and decompress them
+    auto all_decompressed_buffer = iterate_and_decompress_blocks(entryStream, datamodel_ofs, datamodel_size, xpress9_wrapper, virtual_directory_offset, virtual_directory_size, trailing_blocks, skip_offset);
+
+    // Prefix all_decompressed_buffer with initial_decompressed_buffer in case we have only one block
+    all_decompressed_buffer.insert(all_decompressed_buffer.begin(), initial_decompressed_buffer.begin(), initial_decompressed_buffer.end());
+
+    if (skip_offset + all_decompressed_buffer.size() < virtual_directory_offset + virtual_directory_size)
+    {
+        throw std::runtime_error("Could not parse the entire DataModel.");
+    }
+    // Finally, extract the SQLite buffer from the decompressed data
+    return extract_sqlite_buffer(all_decompressed_buffer, skip_offset, virtual_directory_offset, virtual_directory_size);
+}
+std::vector<uint8_t> AbfParser::get_sqlite_v2(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks=15)
+{
+    // Initialize zip and locate DataModel
+    auto [datamodel_ofs, datamodel_size]  = locate_datamodel(context,path);
 
     // Open file stream
     std::ifstream entryStream(path, std::ios::binary);

@@ -17,6 +17,12 @@
 
 #include "Xpress9Wrapper.h"
 #include "Crc32.h"
+#include "duckdb.hpp"
+#include "pbix.h"
+#include "FileHandleStream.h"
+#include <sstream>
+#include "kaitai/kaitaistream.h"
+
 
 // Constants related to ZIP file parsing
 constexpr unsigned char ZIP_LOCAL_FILE_HEADER_FIXED = 26;
@@ -28,6 +34,7 @@ constexpr unsigned short ABF_BACKUP_LOG_HEADER_SIZE = 0x1000 - ABF_BACKUP_LOG_HE
 class AbfParser {
 public:
     static std::vector<uint8_t> get_sqlite(const std::string &path, const int trailing_chunks);
+    static std::vector<uint8_t> get_sqlite_v2(duckdb::ClientContext &context,const std::string &path, const int trailing_chunks);
 private:
     static void patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t& block_index_iterator);
     static std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, uint64_t offset, int size);
@@ -35,6 +42,7 @@ private:
     static std::tuple<uint64_t,int> process_backup_log_header(const std::vector<uint8_t> &buffer);
     static std::vector<uint8_t> extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size);
     static std::pair<uint64_t, uint64_t> initialize_zip_and_locate_datamodel(const std::string &path);
+    static std::pair<uint64_t, uint64_t> locate_datamodel(duckdb::ClientContext &context, const std::string &path);
     static void read_compressed_datamodel_header(std::ifstream &entryStream, uint64_t &datamodel_ofs);
     static std::vector<uint8_t> decompress_initial_block(std::ifstream &entryStream, uint64_t datamodel_ofs, XPress9Wrapper &xpress9_wrapper);
     static std::vector<uint8_t> iterate_and_decompress_blocks(std::ifstream &entryStream, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, uint64_t virtual_directory_offset, int virtual_directory_size, const int trailing_blocks, uint64_t &skip_offset);

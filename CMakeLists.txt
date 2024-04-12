@@ -33,6 +33,9 @@ set(XPRESS9_SOURCES
     third_party/xpress9/Xpress9Misc.c
     third_party/xpress9/Xpress9Wrapper.cpp)
 
+set(KAITAI_SOURCES
+    third_party/kaitai/kaitaistream.cpp)
+
 SET(ABF_SOURCES
     src/abf/AbfParser.cpp
     src/abf/BackupFile.cpp
@@ -45,7 +48,8 @@ SET(ABF_SOURCES
     src/abf/FileList.cpp
     src/abf/Languages.cpp
     src/abf/LogBackupFile.cpp
-    src/abf/VirtualDirectory.cpp)
+    src/abf/VirtualDirectory.cpp
+    src/abf/pbix.cpp)
 
 set(EXTENSION_SOURCES 
     src/pbix_extension.cpp
@@ -57,6 +61,7 @@ set(EXTENSION_SOURCES
     ${SQLITE_SOURCES}
     ${TINYXML2_SOURCES}
     ${XPRESS9_SOURCES}
+    ${KAITAI_SOURCES}
     ${ABF_SOURCES})
 
 # build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
