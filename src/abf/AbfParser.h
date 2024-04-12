@@ -18,6 +18,7 @@
 #include "Xpress9Wrapper.h"
 #include "Crc32.h"
 #include "duckdb.hpp"
+#include "duckdb/common/file_open_flags.hpp"
 #include "pbix.h"
 #include "FileHandleStream.h"
 #include <sstream>
@@ -30,6 +31,7 @@ constexpr unsigned char ZIP_LOCAL_FILE_HEADER = 30;
 constexpr unsigned char ABF_XPRESS9_SIGNATRUE = 102;
 constexpr unsigned char ABF_BACKUP_LOG_HEADER_OFFSET = 72;
 constexpr unsigned short ABF_BACKUP_LOG_HEADER_SIZE = 0x1000 - ABF_BACKUP_LOG_HEADER_OFFSET;
+static constexpr idx_t FILE_READ = idx_t(1 << 0);
 
 class AbfParser {
 public:

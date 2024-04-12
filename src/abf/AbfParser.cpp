@@ -112,7 +112,7 @@ std::pair<uint64_t, uint64_t> AbfParser::initialize_zip_and_locate_datamodel(con
 
 std::pair<uint64_t, uint64_t> AbfParser::locate_datamodel(duckdb::ClientContext &context,const std::string &path) {
     auto &fs = duckdb::FileSystem::GetFileSystem(context);
-    auto file_handle = fs.OpenFile(path, duckdb::FileFlags::FILE_FLAGS_READ);
+    auto file_handle = fs.OpenFile(path, FILE_READ);
     duckdb::FileHandleStream file_stream(file_handle.get());
 
     kaitai::kstream ks(&file_stream);

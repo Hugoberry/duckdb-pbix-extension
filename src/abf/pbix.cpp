@@ -115,7 +115,7 @@ void pbix_t::central_dir_entry_t::_read() {
     m_int_file_attr = m__io->read_u2le();
     m_ext_file_attr = m__io->read_u4le();
     m_ofs_local_header = m__io->read_s4le();
-    m_file_name = kaitai::kstream::bytes_to_str(m__io->read_bytes(len_file_name()), std::string("UTF-8"));
+    m_file_name = kaitai::kstream::bytes_to_str(m__io->read_bytes(len_file_name()), "UTF-8");
     m_extra = m__io->read_bytes((len_extra() + len_comment()));
 }
 
