@@ -64,7 +64,7 @@ SQLiteDB SQLiteDB::Open(const string &path, const SQLiteOpenOptions &options, bo
 	return result;
 }
 
-SQLiteDB SQLiteDB::OpenFromBuffer(const string &path, const SQLiteOpenOptions &options, const std::vector<unsigned char> &buffer){
+SQLiteDB SQLiteDB::OpenFromBuffer(const SQLiteOpenOptions &options, const std::vector<unsigned char> &buffer){
         SQLiteDB result;
 		result.dbBuffer = buffer; // buffer for in-memory database
 		// int flags = SQLITE_OPEN_SHAREDCACHE  | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_MEMORY;

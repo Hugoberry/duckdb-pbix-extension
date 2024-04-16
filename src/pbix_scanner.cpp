@@ -51,8 +51,8 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 static SQLiteDB ExtractDB(ClientContext &context, const string &path, int trailing_chunks) {
 
 	SQLiteOpenOptions options;
-	auto sqliteBuffer = AbfParser::get_sqlite(path, trailing_chunks);
-	return SQLiteDB::OpenFromBuffer(path, options, sqliteBuffer);
+	auto sqliteBuffer = AbfParser::get_sqlite_v2(context, path, trailing_chunks);
+	return SQLiteDB::OpenFromBuffer(options, sqliteBuffer);
 
 }
 
