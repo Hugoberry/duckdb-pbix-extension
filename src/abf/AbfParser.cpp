@@ -129,7 +129,9 @@ std::pair<uint64_t, uint64_t> AbfParser::locate_datamodel(duckdb::FileHandle &fi
 
     // Initialize the zip archive for reading using the custom IO
     if (!mz_zip_reader_init(&zip_archive, file_handle_p.GetFileSize(), MZ_ZIP_FLAG_COMPRESSED_DATA)) {  // Note: MZ_ZIP_FLAG_DO_NOT_SORT_CENTRAL_DIRECTORY might be needed depending on use case
-        throw std::runtime_error("Could not initialize zip reader");
+        const char *error_message = mz_zip_get_error_string(mz_zip_get_last_error(&zip_archive));
+        mz_zip_reader_end(&zip_archive); // Clean up before throwing
+        throw std::runtime_error(std::string("Could not initialize zip reader: ") + error_message);
     }
 
     // Locate the DataModel file within the zip
