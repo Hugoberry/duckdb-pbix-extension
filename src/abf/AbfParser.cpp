@@ -1,5 +1,6 @@
 #include "AbfParser.h"
 // #include "duckdb/common/file_system.hpp"
+#include "ZipUtils.h"
 
 
 using namespace tinyxml2;
@@ -376,7 +377,28 @@ std::vector<uint8_t> AbfParser::get_sqlite_v2(duckdb::ClientContext &context, co
         throw std::runtime_error("Could not open zip file");
     }
 
-    auto [datamodel_ofs, datamodel_size] = locate_datamodel(*file_handle, path);
+    // auto [datamodel_ofs, datamodel_size] = locate_datamodel(*file_handle, path);
+
+    // std::cout << "datamodel_ofs: " << datamodel_ofs << std::endl;
+    // std::cout << "datamodel_size: " << datamodel_size << std::endl;
+
+    // try {
+        // Define a variable to hold the end of central directory record
+        ZipUtils::EndOfCentralDirectoryRecord eocd;
+
+        // Find the end of central directory record
+        if (!ZipUtils::findEndOfCentralDirectory(*file_handle, eocd)) {
+            throw std::runtime_error("End of central directory not found.");
+        }
+
+        // Now, try to find a specific file in the ZIP, for example "DataModel"
+        auto [datamodel_ofs, datamodel_size] = ZipUtils::findDataModel(*file_handle);
+
+    // } catch (const std::runtime_error& e) {
+    //     std::cerr << "Error: " << e.what() << std::endl;
+    // }
+
+
     uint64_t bytes_read = 0;
     uint16_t zip_pointer = 0;
 

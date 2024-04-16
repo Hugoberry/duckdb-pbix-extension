@@ -18,6 +18,7 @@
 #include "Xpress9Wrapper.h"
 #include "Crc32.h"
 #include "duckdb.hpp"
+#include "ZipUtils.h"
 
 
 

@@ -46,6 +46,7 @@ SET(ABF_SOURCES
     src/abf/FileList.cpp
     src/abf/Languages.cpp
     src/abf/LogBackupFile.cpp
+    src/abf/ZipUtils.cpp
     src/abf/VirtualDirectory.cpp)
 
 set(EXTENSION_SOURCES 
