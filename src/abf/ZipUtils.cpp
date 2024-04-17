@@ -1,105 +1,57 @@
 #include "ZipUtils.h"
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <algorithm>
-#include <cstring>
 
+bool ZipUtils::findEndOfCentralDirectory(duckdb::FileHandle &file_handle, ZipUtils::EndOfCentralDirectoryRecord &eocd)
+{
+    const uint32_t signatureEOCD = 0x504b0506;
+    // const uint32_t signatureEOCD = 0x06054b50;
+    std::vector<char> buffer(4096);
+    idx_t fileSize = file_handle.GetFileSize();
+    int64_t searchOffset = std::min(static_cast<int64_t>(fileSize), static_cast<int64_t>(buffer.size()));
 
-    bool ZipUtils::findEndOfCentralDirectory(std::istream& stream, ZipUtils::EndOfCentralDirectoryRecord& eocd) {
-        const uint32_t signatureEOCD = 0x06054b50;
-        std::vector<char> buffer(4096);
-        stream.seekg(0, std::ios::end);
-        std::streampos fileSize = stream.tellg();
-        int64_t searchOffset = std::min(static_cast<int64_t>(fileSize), static_cast<int64_t>(buffer.size()));
+    file_handle.Seek(fileSize - searchOffset);
+    file_handle.Read(buffer.data(), searchOffset);
 
-        stream.seekg(-searchOffset, std::ios::end);
-        stream.read(buffer.data(), searchOffset);
-        auto foundPos = std::search(buffer.rbegin(), buffer.rend(), reinterpret_cast<const char*>(&signatureEOCD), reinterpret_cast<const char*>(&signatureEOCD) + sizeof(signatureEOCD));
+    auto foundPos = std::search(buffer.rbegin(), buffer.rend(), reinterpret_cast<const char *>(&signatureEOCD), reinterpret_cast<const char *>(&signatureEOCD) + sizeof(signatureEOCD));
 
-        if (foundPos != buffer.rend()) {
-            size_t offset = std::distance(buffer.begin(), foundPos.base()) - sizeof(signatureEOCD);
-            stream.seekg(-searchOffset + offset, std::ios::end);
-            stream.read(reinterpret_cast<char*>(&eocd), sizeof(eocd));
-            return true;
-        }
-        return false;
+    if (foundPos != buffer.rend())
+    {
+        idx_t offset = std::distance(buffer.begin(), foundPos.base()) - sizeof(signatureEOCD);
+        file_handle.Seek(fileSize - searchOffset + offset);
+        file_handle.Read(reinterpret_cast<char *>(&eocd), sizeof(eocd));
+        return true;
+    }
+    return false;
+}
+
+std::pair<uint32_t, uint32_t> ZipUtils::findDataModel(duckdb::FileHandle &file_handle)
+{
+    ZipUtils::EndOfCentralDirectoryRecord eocd;
+    if (!findEndOfCentralDirectory(file_handle, eocd))
+    {
+        throw std::runtime_error("End of central directory not found.");
     }
 
-    std::pair<uint32_t, uint32_t> ZipUtils::findDataModel(std::istream& zipStream) {
-        ZipUtils::EndOfCentralDirectoryRecord eocd;
-        if (!findEndOfCentralDirectory(zipStream, eocd)) {
-            throw std::runtime_error("End of central directory not found.");
+    file_handle.Seek(eocd.centralDirectoryOffset);
+    ZipUtils::CentralDirectoryFileHeader cdHeader;
+    idx_t position = eocd.centralDirectoryOffset;
+
+    for (int i = 0; i < eocd.numEntries; ++i)
+    {
+        file_handle.Read(reinterpret_cast<char *>(&cdHeader), sizeof(cdHeader));
+        std::vector<char> filename(cdHeader.fileNameLength);
+        file_handle.Read(filename.data(), cdHeader.fileNameLength);
+
+        position += sizeof(cdHeader) + cdHeader.fileNameLength;
+
+        if (std::string(filename.begin(), filename.end()) == "DataModel")
+        {
+            return {cdHeader.localHeaderOffset, cdHeader.compressedSize};
         }
 
-        zipStream.seekg(eocd.centralDirectoryOffset, std::ios::beg);
-        ZipUtils::CentralDirectoryFileHeader cdHeader;
-
-        for (int i = 0; i < eocd.numEntries; ++i) {
-            zipStream.read(reinterpret_cast<char*>(&cdHeader), sizeof(cdHeader));
-            if (cdHeader.signature != 0x504b0102) {
-                throw std::runtime_error("Invalid central directory file header signature.");
-            }
-
-            std::vector<char> filename(cdHeader.fileNameLength);
-            zipStream.read(filename.data(), cdHeader.fileNameLength);
-            zipStream.ignore(cdHeader.extraFieldLength + cdHeader.fileCommentLength);
-
-            if (std::string(filename.begin(), filename.end()) == "DataModel") {
-                return {cdHeader.localHeaderOffset, cdHeader.compressedSize};
-            }
-        }
-
-        throw std::runtime_error("DataModel not found in the zip file.");
-    }
-    
-    bool ZipUtils::findEndOfCentralDirectory(duckdb::FileHandle& file_handle, ZipUtils::EndOfCentralDirectoryRecord& eocd) {
-        const uint32_t signatureEOCD = 0x504b0506;
-        // const uint32_t signatureEOCD = 0x06054b50;
-        std::vector<char> buffer(4096);
-        idx_t fileSize = file_handle.GetFileSize();
-        int64_t searchOffset = std::min(static_cast<int64_t>(fileSize), static_cast<int64_t>(buffer.size()));
-
-        file_handle.Seek(fileSize - searchOffset);
-        file_handle.Read(buffer.data(), searchOffset);
-
-        auto foundPos = std::search(buffer.rbegin(), buffer.rend(), reinterpret_cast<const char*>(&signatureEOCD), reinterpret_cast<const char*>(&signatureEOCD) + sizeof(signatureEOCD));
-
-        if (foundPos != buffer.rend()) {
-            idx_t offset = std::distance(buffer.begin(), foundPos.base()) - sizeof(signatureEOCD);
-            file_handle.Seek(fileSize - searchOffset + offset);
-            file_handle.Read(reinterpret_cast<char*>(&eocd), sizeof(eocd));
-            return true;
-        }
-        return false;
+        // Move to the next entry, skipping over the extra fields and comments
+        position += cdHeader.extraFieldLength + cdHeader.fileCommentLength;
+        file_handle.Seek(position); // Seek to the next header position
     }
 
-    std::pair<uint32_t, uint32_t> ZipUtils::findDataModel(duckdb::FileHandle& file_handle) {
-        ZipUtils::EndOfCentralDirectoryRecord eocd;
-        if (!findEndOfCentralDirectory(file_handle, eocd)) {
-            throw std::runtime_error("End of central directory not found.");
-        }
-
-        file_handle.Seek(eocd.centralDirectoryOffset);
-        ZipUtils::CentralDirectoryFileHeader cdHeader;
-        idx_t position = eocd.centralDirectoryOffset;
-
-        for (int i = 0; i < eocd.numEntries; ++i) {
-            file_handle.Read(reinterpret_cast<char*>(&cdHeader), sizeof(cdHeader));
-            std::vector<char> filename(cdHeader.fileNameLength);
-            file_handle.Read(filename.data(), cdHeader.fileNameLength);
-
-            position += sizeof(cdHeader) + cdHeader.fileNameLength;
-
-            if (std::string(filename.begin(), filename.end()) == "DataModel") {
-                return {cdHeader.localHeaderOffset, cdHeader.compressedSize};
-            }
-
-            // Move to the next entry, skipping over the extra fields and comments
-            position += cdHeader.extraFieldLength + cdHeader.fileCommentLength;
-            file_handle.Seek(position);  // Seek to the next header position
-        }
-
-        throw std::runtime_error("DataModel not found in the zip file.");
-    }
-
+    throw std::runtime_error("DataModel not found in the zip file.");
+}

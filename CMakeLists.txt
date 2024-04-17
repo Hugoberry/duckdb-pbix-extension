@@ -12,14 +12,10 @@ set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 project(${TARGET_NAME})
 include_directories(src/include)
 include_directories(src/abf)
-include_directories(third_party/miniz)
 include_directories(third_party/sqlite)
 include_directories(third_party/tinyxml2)
 include_directories(third_party/xpress9)
 include_directories(third_party)
-
-set(MINIZ_SOURCES
-    third_party/miniz/miniz.c)
 
 set(SQLITE_SOURCES
     third_party/sqlite/sqlite3.c
@@ -55,7 +51,6 @@ set(EXTENSION_SOURCES
     src/sqlite_db.cpp 
     src/sqlite_stmt.cpp
     src/sqlite_utils.cpp
-    ${MINIZ_SOURCES}
     ${SQLITE_SOURCES}
     ${TINYXML2_SOURCES}
     ${XPRESS9_SOURCES}

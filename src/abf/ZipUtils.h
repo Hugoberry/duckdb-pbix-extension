@@ -1,8 +1,6 @@
 #ifndef ZIP_UTILS_H
 #define ZIP_UTILS_H
 
-#include <iostream>
-#include <fstream>
 #include <vector>
 #include "duckdb.hpp"
 
@@ -48,9 +46,7 @@ public:
         uint32_t localHeaderOffset;
     };
 #pragma pack(pop)
-    static bool findEndOfCentralDirectory(std::istream &stream, ZipUtils::EndOfCentralDirectoryRecord &eocd);
     static bool findEndOfCentralDirectory(duckdb::FileHandle &file_handle, ZipUtils::EndOfCentralDirectoryRecord &eocd);
-    static std::pair<uint32_t, uint32_t> findDataModel(std::istream &zipStream);
     static std::pair<uint32_t, uint32_t> findDataModel(duckdb::FileHandle &file_handle);
 };
 

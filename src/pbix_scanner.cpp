@@ -51,77 +51,11 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 static SQLiteDB ExtractDB(ClientContext &context, const string &path, int trailing_chunks) {
 
 	SQLiteOpenOptions options;
-	auto sqliteBuffer = AbfParser::get_sqlite_v2(context, path, trailing_chunks);
+	auto sqliteBuffer = AbfParser::get_sqlite(context, path, trailing_chunks);
 	return SQLiteDB::OpenFromBuffer(options, sqliteBuffer);
 
 }
 
-/*
-static SQLiteDB ExtractDB(ClientContext &context, const string &path){
-    // Open and parse the PBIX file
-    std::ifstream is_pbix(path, std::ifstream::binary);
-    if (!is_pbix.is_open()) {
-        throw std::runtime_error("Failed to open PBIX file");
-    }
-    kaitai::kstream ks_pbix(&is_pbix);
-    pbix_t data(&ks_pbix);
-	
-	
-	// Loop through each section in the ZIP file
-    for (auto& section : *data.sections()) {
-        // The section type we're interested in is the local_file, which contains file_name
-        if (section->section_type() == 1027) { //LOCAL_FILE
-			auto localFile = static_cast<pbix_t::local_file_t*>(section->body());
-            // Check if the file_name is "DataModel"
-            if (localFile->header()->file_name() == "DataModel") {
-				auto datamodel = localFile->datamodel();
-				//break; // Stop the loop once we find the "DataModel" section
-
-
-
-				// Buffer to store all decompressed data
-				std::vector<uint8_t> allDecompressedData;
-				// Initialize the XPress9Wrapper
-				XPress9Wrapper xpress9Wrapper;
-				if(xpress9Wrapper.Initialize() == false){
-					throw std::runtime_error("Failed to initialize XPress9Wrapper");
-				}
-
-				// Loop through each chunk in the DataModel
-				for(auto& chunk : *datamodel->chunks()){
-
-					// Buffers for storing decompressed data
-					std::vector<uint8_t> x9DecompressedBuffer(chunk->uncompressed());
-					auto node = chunk->_raw_node();
-					std::vector<uint8_t> compressedData =  std::vector<unsigned char>(node.begin(), node.end());
-
-					// Decompress the entire data
-					uint32_t totalDecompressedSize = xpress9Wrapper.Decompress(compressedData.data(), chunk->compressed(), x9DecompressedBuffer.data(), x9DecompressedBuffer.size());
-
-					// Verify that the total decompressed size matches the expected size
-					if (totalDecompressedSize != chunk->uncompressed()) {
-						throw std::runtime_error("Decompressed size does not match expected size.");
-					}
-					else {
-						// Add the decompressed data to the overall buffer
-						allDecompressedData.insert(allDecompressedData.end(), x9DecompressedBuffer.begin(), x9DecompressedBuffer.end());
-					}
-				}
-
-				AbfParser parser;
-				auto sqliteBuffer = parser.process_data(allDecompressedData);
-
-				SQLiteOpenOptions options;
-				return SQLiteDB::OpenFromBuffer(path, options, sqliteBuffer);
-	            }
-        }
-    }
-	throw std::runtime_error("Failed to find DataModel section in PBIX file");
-	return SQLiteDB();
-
-}
-
-*/
 static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBindInput &input,
                                            vector<LogicalType> &return_types, vector<string> &names) {
 
@@ -142,7 +76,6 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 	// db = SQLiteDB::Open(result->file_name, options);
 	db = ExtractDB(context, result->file_name, result->trailing_chunks);
 
-	// std::cout << "Opened SQLite database" << std::endl;
 	
 	ColumnList columns;
 	vector<unique_ptr<Constraint>> constraints;
