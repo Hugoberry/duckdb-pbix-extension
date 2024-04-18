@@ -1,8 +1,8 @@
 #pragma once
 
 #include <vector>
-#include "LogBackupFile.h"
-#include "../../third_party/tinyxml2/tinyxml2.h"
+#include "log_backup_file.h"
+#include "tinyxml2.h"
 
 class FileList {
 public:

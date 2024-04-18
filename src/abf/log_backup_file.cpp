@@ -1,6 +1,5 @@
 // LogBackupFile.cpp
-#include "LogBackupFile.h"
-#include "../../third_party/tinyxml2/tinyxml2.h"
+#include "log_backup_file.h"
 
 using namespace tinyxml2;
 

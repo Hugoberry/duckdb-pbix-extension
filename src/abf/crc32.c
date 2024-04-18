@@ -1,4 +1,4 @@
-#include "Crc32.h"
+#include "crc32.h"
 
 // Generating polynomial for Crc32 is
 // 0x82f63b78 =

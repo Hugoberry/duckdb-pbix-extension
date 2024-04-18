@@ -1,4 +1,4 @@
-#include "ZipUtils.h"
+#include "zip_utils.h"
 
 bool ZipUtils::findEndOfCentralDirectory(duckdb::FileHandle &file_handle, ZipUtils::EndOfCentralDirectoryRecord &eocd)
 {

@@ -1,6 +1,5 @@
 // Collations.cpp
-#include "Collations.h"
-#include "../../third_party/tinyxml2/tinyxml2.h"
+#include "collations.h"
 
 using namespace tinyxml2;
 

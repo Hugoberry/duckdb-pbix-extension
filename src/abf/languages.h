@@ -6,7 +6,7 @@
 #include <optional>
 #include <iostream>
 #include <string>
-#include "../../third_party/tinyxml2/tinyxml2.h"
+#include "tinyxml2.h"
 
 class Languages {
 public:

@@ -3,8 +3,9 @@
 #include <vector>
 #include <string>
 #include <optional>
-#include "FileList.h"
-#include "../../third_party/tinyxml2/tinyxml2.h"
+#include <stdexcept>
+#include "file_list.h"
+#include "tinyxml2.h"
 
 class FileGroup {
 public:
@@ -19,4 +20,11 @@ public:
     std::optional<std::vector<FileList>> FileLists;
 
     static FileGroup from_xml(tinyxml2::XMLElement& element);
+};
+
+class FileGroups {
+public:
+    std::optional<std::vector<FileGroup>> FileGroupList;
+
+    static FileGroups from_xml(tinyxml2::XMLElement& element);
 };

@@ -7,12 +7,12 @@
 #include <string>
 #include <optional>
 #include <sstream>
-#include "Collations.h"
-#include "Languages.h"
-#include "FileGroups.h"
+#include "collations.h"
+#include "languages.h"
+#include "file_group.h"
 #include <codecvt>
 #include <locale>
-#include "../../third_party/tinyxml2/tinyxml2.h"
+#include "tinyxml2.h"
 
 class BackupLog {
 public:

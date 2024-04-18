@@ -2,8 +2,8 @@
 
 #include <vector>
 #include <optional>
-#include "BackupFile.h"
-#include "../../third_party/tinyxml2/tinyxml2.h"
+#include "backup_file.h"
+#include "tinyxml2.h"
 // VirtualDirectory
 class VirtualDirectory {
 public:
