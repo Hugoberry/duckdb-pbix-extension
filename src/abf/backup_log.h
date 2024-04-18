@@ -1,8 +1,4 @@
-// BackupLog.h
-#ifndef BACKUPLOG_H
-#define BACKUPLOG_H
-
-#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+#pragma once
 
 #include <string>
 #include <optional>
@@ -34,5 +30,3 @@ public:
 
     static BackupLog from_xml(const std::vector<uint8_t>& buffer, const std::string& encoding);
 };
-
-#endif // BACKUPLOG_H

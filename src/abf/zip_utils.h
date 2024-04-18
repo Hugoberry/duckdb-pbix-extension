@@ -1,5 +1,5 @@
-#ifndef ZIP_UTILS_H
-#define ZIP_UTILS_H
+#pragma once
+
 
 #include <vector>
 #include "duckdb.hpp"
@@ -50,4 +50,4 @@ public:
     static std::pair<uint32_t, uint32_t> findDataModel(duckdb::FileHandle &file_handle);
 };
 
-#endif // ZIP_UTILS_H
+

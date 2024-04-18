@@ -1,6 +1,5 @@
-// Collations.h
-#ifndef COLLATIONS_H
-#define COLLATIONS_H
+#pragma once
+
 
 #include <vector>
 #include <optional>
@@ -14,4 +13,3 @@ public:
     static Collations from_xml(tinyxml2::XMLElement& element);
 };
 
-#endif // COLLATIONS_H

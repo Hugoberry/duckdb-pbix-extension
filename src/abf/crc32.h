@@ -1,5 +1,4 @@
-#ifndef CRC32_H
-#define CRC32_H
+#pragma once
 
 #include <stdint.h> // For uint32_t, uint8_t types
 #include <stddef.h>
@@ -15,4 +14,3 @@ uint32_t Crc32(const uint8_t *pData, size_t uSize, uint32_t uCrc);
 }
 #endif
 
-#endif // CRC32_H

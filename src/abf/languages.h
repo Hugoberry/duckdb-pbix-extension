@@ -1,6 +1,4 @@
-// Languages.h
-#ifndef LANGUAGES_H
-#define LANGUAGES_H
+#pragma once
 
 #include <vector>
 #include <optional>
@@ -15,4 +13,3 @@ public:
     static Languages from_xml(tinyxml2::XMLElement& element);
 };
 
-#endif // LANGUAGES_H
