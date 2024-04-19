@@ -4,6 +4,16 @@
 
 using namespace tinyxml2;
 
+std::string trimAfterLastTag(const std::string& xmlContent) {
+    // Find the last occurrence of the closing tag
+    size_t lastTagPos = xmlContent.find_last_of('>');
+    if (lastTagPos != std::string::npos) {
+        // Trim everything after the last closing tag
+        return xmlContent.substr(0, lastTagPos + 1);
+    }
+    return xmlContent; // Return original if '>' not found
+}
+
 BackupLog BackupLog::from_xml(const std::vector<uint8_t>& buffer, const std::string& encoding) {
     std::string buffer_utf8;
     if (encoding == "UTF-16") {
@@ -15,6 +25,7 @@ BackupLog BackupLog::from_xml(const std::vector<uint8_t>& buffer, const std::str
         buffer_utf8 = std::string(buffer.begin(), buffer.end());
     }
 
+    buffer_utf8 = trimAfterLastTag(buffer_utf8);
     XMLDocument doc;
     doc.Parse(reinterpret_cast<const char*>(buffer_utf8.data()), buffer_utf8.size());
 

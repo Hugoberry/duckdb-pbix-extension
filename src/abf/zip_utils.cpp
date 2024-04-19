@@ -32,12 +32,16 @@ std::pair<uint32_t, uint32_t> ZipUtils::findDataModel(duckdb::FileHandle &file_h
     }
 
     file_handle.Seek(eocd.centralDirectoryOffset);
-    ZipUtils::CentralDirectoryFileHeader cdHeader;
     idx_t position = eocd.centralDirectoryOffset;
 
     for (int i = 0; i < eocd.numEntries; ++i)
     {
-        file_handle.Read(reinterpret_cast<char *>(&cdHeader), sizeof(cdHeader));
+        std::vector<char> headerBuffer(sizeof(ZipUtils::CentralDirectoryFileHeader));
+        file_handle.Read(headerBuffer.data(), sizeof(ZipUtils::CentralDirectoryFileHeader));
+
+        ZipUtils::CentralDirectoryFileHeader cdHeader;
+        memcpy(&cdHeader, headerBuffer.data(), sizeof(cdHeader));
+
         std::vector<char> filename(cdHeader.fileNameLength);
         file_handle.Read(filename.data(), cdHeader.fileNameLength);
 

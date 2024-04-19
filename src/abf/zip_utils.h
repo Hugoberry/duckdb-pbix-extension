@@ -2,6 +2,7 @@
 
 
 #include <vector>
+#include <cstring>
 #include "duckdb.hpp"
 
 // Class containing static utility methods for working with ZIP files.
