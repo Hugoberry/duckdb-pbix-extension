@@ -18,6 +18,7 @@
 
 
 #include "abf_parser.h"
+#include "backup_log.h"
 
 #include <cmath>
 
@@ -51,7 +52,7 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 static SQLiteDB ExtractDB(ClientContext &context, const string &path, int trailing_chunks) {
 
 	SQLiteOpenOptions options;
-	auto sqliteBuffer = AbfParser::get_sqlite(context, path, trailing_chunks);
+	auto [sqliteBuffer,backup_log] = AbfParser::get_sqlite(context, path, trailing_chunks);
 	return SQLiteDB::OpenFromBuffer(options, sqliteBuffer);
 
 }

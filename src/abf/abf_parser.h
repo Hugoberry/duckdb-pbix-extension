@@ -28,9 +28,19 @@ constexpr uint32_t BLOCK_SIZE = 0x200000;
 constexpr unsigned short ABF_BACKUP_LOG_HEADER_SIZE = 0x1000 - ABF_BACKUP_LOG_HEADER_OFFSET;
 static constexpr idx_t FILE_READ = idx_t(1 << 0);
 
+struct VertipaqFile
+{
+    std::string Path;
+    std::string FileName;
+    std::string StoragePath;
+    uint64_t Size;
+    uint64_t m_cbOffsetHeader;
+};
+
+
 class AbfParser {
 public:
-    static std::vector<uint8_t> get_sqlite(duckdb::ClientContext &context,const std::string &path, const int trailing_chunks);
+    static std::tuple<std::vector<uint8_t>, std::vector<VertipaqFile>>  get_sqlite(duckdb::ClientContext &context,const std::string &path, const int trailing_chunks);
 private:
     // duckdb::FileHandle *file_handle;
     // mz_zip_archive zip_archive;
@@ -38,9 +48,10 @@ private:
     static std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, uint64_t offset, int size);
     static std::vector<uint8_t> trim_buffer(const std::vector<uint8_t>& buffer);
     static std::tuple<uint64_t,int> process_backup_log_header(const std::vector<uint8_t> &buffer);
-    static std::vector<uint8_t> extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size);
+    static std::tuple<std::vector<uint8_t>, std::vector<VertipaqFile>>  extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size);
     static std::pair<uint64_t, uint64_t> locate_datamodel(duckdb::FileHandle &file_handle, const std::string &path);
     static void read_compressed_datamodel_header(std::ifstream &entryStream, uint64_t &datamodel_ofs);
+    static std::vector<VertipaqFile> match_logs_and_get_vertipaq_meta(const BackupLog& backupLog, const VirtualDirectory& virtualDirectory);
     static std::vector<uint8_t> decompress_initial_block(duckdb::FileHandle &file_handle, uint64_t &bytes_read, XPress9Wrapper &xpress9_wrapper);
     static std::vector<uint8_t> iterate_and_decompress_blocks(duckdb::FileHandle &file_handle, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, uint64_t virtual_directory_offset, int virtual_directory_size, const int trailing_blocks, uint64_t &skip_offset);
 };

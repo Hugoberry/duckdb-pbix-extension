@@ -16,7 +16,7 @@ public:
     int PersistLocation;
     std::optional<std::string> PersistLocationPath;
     std::optional<std::string> StorageLocationPath;
-    std::optional<std::string> ObjectID;  // I'm using string to simplify, but you may want to use a UUID/GUID type
+    std::optional<std::string> ObjectID; // GUID
     std::optional<std::vector<FileList>> FileLists;
 
     static FileGroup from_xml(tinyxml2::XMLElement& element);

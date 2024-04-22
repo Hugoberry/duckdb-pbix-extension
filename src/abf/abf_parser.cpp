@@ -36,7 +36,7 @@ std::tuple<uint64_t, int> AbfParser::process_backup_log_header(const std::vector
     return {backup_log_header.m_cbOffsetHeader, backup_log_header.DataSize};
 }
 
-std::vector<uint8_t> AbfParser::extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size)
+std::tuple<std::vector<uint8_t>, std::vector<VertipaqFile>>  AbfParser::extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size)
 {
     std::vector<uint8_t> virtual_directory_buffer = read_buffer_bytes(buffer, virtual_directory_offset - skip_offset, virtual_directory_size);
     VirtualDirectory virtual_directory = VirtualDirectory::from_xml(virtual_directory_buffer, "UTF-8");
@@ -64,7 +64,54 @@ std::vector<uint8_t> AbfParser::extract_sqlite_buffer(const std::vector<uint8_t>
     uint64_t sqlite_offset = sqlite.m_cbOffsetHeader;
     int sqlite_size = sqlite.Size;
 
-    return read_buffer_bytes(buffer, sqlite_offset - skip_offset, sqlite_size);
+    return {read_buffer_bytes(buffer, sqlite_offset - skip_offset, sqlite_size), match_logs_and_get_vertipaq_meta(backup_log, virtual_directory)};
+}
+
+
+std::vector<VertipaqFile> AbfParser::match_logs_and_get_vertipaq_meta(const BackupLog& backupLog, const VirtualDirectory& virtualDirectory)
+{
+
+    std::vector<VertipaqFile> matchedData;
+    // Check if fileGroups and backupFiles are populated
+    if (!backupLog.fileGroups.has_value() || !virtualDirectory.backupFiles.has_value()) {
+        std::cerr << "Missing file groups or backup files." << std::endl;
+        return matchedData;
+    }
+
+    const auto& fileGroups = backupLog.fileGroups->FileGroupList.value();
+    const auto& backupFiles = virtualDirectory.backupFiles.value();
+    
+    // Create a map from storage paths to backup files
+    std::map<std::string, BackupFile> virtualDirectoryFilesByPath;
+    for (const auto& file : backupFiles) {
+        virtualDirectoryFilesByPath[file.Path.value()] = file;
+    }
+
+    // Loop through each file group and each file within the group
+    for (const auto& fileGroup : fileGroups) {
+        if (!fileGroup.FileLists.has_value()) continue;
+        for (const auto& fileList : fileGroup.FileLists.value()) {
+            for (const auto& backupFile : fileList.BackupFiles.value()) {
+                if (!backupFile.StoragePath.has_value()) continue;
+                auto it = virtualDirectoryFilesByPath.find(backupFile.StoragePath.value());
+                if (it != virtualDirectoryFilesByPath.end()) {
+                    const BackupFile& matchedFile = it->second;
+                    std::string pathWithoutPersistRoot = backupFile.Path.value_or("");
+                    VertipaqFile data;
+                    data.Path = pathWithoutPersistRoot;
+                    data.FileName = pathWithoutPersistRoot.substr(pathWithoutPersistRoot.find_last_of('\\') + 1);
+                    data.StoragePath = backupFile.StoragePath.value();
+                    data.Size = matchedFile.Size;
+                    data.m_cbOffsetHeader = matchedFile.m_cbOffsetHeader;
+
+                    matchedData.push_back(data);
+                }
+            }
+        }
+    }
+
+    return matchedData;
+
 }
 
 void AbfParser::patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t &block_index_iterator)
@@ -181,7 +228,7 @@ std::vector<uint8_t> AbfParser::iterate_and_decompress_blocks(duckdb::FileHandle
     return all_decompressed_data;
 }
 
-std::vector<uint8_t> AbfParser::get_sqlite(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks = 15)
+std::tuple<std::vector<uint8_t>, std::vector<VertipaqFile>>  AbfParser::get_sqlite(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks = 15)
 {
     auto &fs = duckdb::FileSystem::GetFileSystem(context);
     // Open the file using FileSystem
