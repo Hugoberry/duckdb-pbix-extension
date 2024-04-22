@@ -113,4 +113,28 @@ LogicalType SQLiteUtils::TypeToLogicalType(const string &sqlite_type) {
 	return LogicalType::VARCHAR;
 }
 
+LogicalType SQLiteUtils::VertipaqTypeToLogicalType(const uint8_t &vertipaq_type) {
+	// type affinity rules are taken from here:
+	// https://learn.microsoft.com/en-us/openspecs/sql_server_protocols/ms-ssas-t/00a9ec7a-5f4d-4517-8091-b370fe2dc18b
+
+	switch (vertipaq_type) {
+	case 2:
+		return LogicalType::VARCHAR;
+	case 8:
+		return LogicalType::BIGINT;
+	case 9:
+		return LogicalType::TIMESTAMP;
+	case 10:
+		return LogicalType::DECIMAL(16,2);
+	case 11:
+		return LogicalType::BOOLEAN;
+	case 17:
+		return LogicalType::BLOB;
+	}
+
+	// alright, give up and fallback to varchar
+	return LogicalType::VARCHAR;
+}
+
+
 } // namespace duckdb

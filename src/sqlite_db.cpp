@@ -202,9 +202,23 @@ void SQLiteDB::GetViewInfo(const string &view_name, string &sql) {
 	}
 	throw InternalException("GetViewInfo - view \"%s\" not found", view_name);
 }
+void SQLiteDB::GetMetaTableInfo(const string &table_name, ColumnList &columns) {
 
-void SQLiteDB::GetTableInfo(const string &table_name, ColumnList &columns, vector<unique_ptr<Constraint>> &constraints,
-                            bool all_varchar) {
+	// columns.AddColumn(ColumnDefinition("RowId", LogicalType::BIGINT));
+	columns.AddColumn(ColumnDefinition("TableName", LogicalType::VARCHAR));
+	columns.AddColumn(ColumnDefinition("ColumnName", LogicalType::VARCHAR));
+	columns.AddColumn(ColumnDefinition("StoragePosition", LogicalType::BIGINT));
+	columns.AddColumn(ColumnDefinition("Dictionary", LogicalType::VARCHAR));
+	columns.AddColumn(ColumnDefinition("HIDX", LogicalType::VARCHAR));
+	columns.AddColumn(ColumnDefinition("IDF", LogicalType::VARCHAR));
+	columns.AddColumn(ColumnDefinition("Cardinality", LogicalType::BIGINT));
+	columns.AddColumn(ColumnDefinition("DataType", LogicalType::BIGINT));
+	columns.AddColumn(ColumnDefinition("BaseId", LogicalType::BIGINT));
+	columns.AddColumn(ColumnDefinition("Magnitude", LogicalType::DOUBLE));
+
+}
+
+void SQLiteDB::GetTableInfo(const string &table_name, ColumnList &columns) {
 	SQLiteStatement stmt;
 
 	idx_t primary_key_index = idx_t(-1);
@@ -221,7 +235,7 @@ void SQLiteDB::GetTableInfo(const string &table_name, ColumnList &columns, vecto
 		auto default_value = stmt.GetValue<string>(4);
 		auto pk = stmt.GetValue<int>(5);
 		StringUtil::Trim(sqlite_type);
-		auto column_type = all_varchar ? LogicalType::VARCHAR : SQLiteUtils::TypeToLogicalType(sqlite_type);
+		auto column_type = SQLiteUtils::TypeToLogicalType(sqlite_type);
 
 		if (pk) {
 			primary_key_index = cid;
@@ -236,21 +250,21 @@ void SQLiteDB::GetTableInfo(const string &table_name, ColumnList &columns, vecto
 			column.SetDefaultValue(std::move(expressions[0]));
 		}
 		columns.AddColumn(std::move(column));
-		if (not_null) {
-			constraints.push_back(make_uniq<NotNullConstraint>(LogicalIndex(cid)));
-		}
+		// if (not_null) {
+		// 	constraints.push_back(make_uniq<NotNullConstraint>(LogicalIndex(cid)));
+		// }
 		found = true;
 	}
 	if (!found) {
 		throw InternalException("GetTableInfo - table \"%s\" not found", table_name);
 	}
-	if (!primary_keys.empty()) {
-		if (primary_keys.size() == 1) {
-			constraints.push_back(make_uniq<UniqueConstraint>(LogicalIndex(primary_key_index), true));
-		} else {
-			constraints.push_back(make_uniq<UniqueConstraint>(std::move(primary_keys), true));
-		}
-	}
+	// if (!primary_keys.empty()) {
+	// 	if (primary_keys.size() == 1) {
+	// 		constraints.push_back(make_uniq<UniqueConstraint>(LogicalIndex(primary_key_index), true));
+	// 	} else {
+	// 		constraints.push_back(make_uniq<UniqueConstraint>(std::move(primary_keys), true));
+	// 	}
+	// }
 }
 
 bool SQLiteDB::ColumnExists(const string &table_name, const string &column_name) {

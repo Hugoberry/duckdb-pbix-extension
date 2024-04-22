@@ -46,6 +46,7 @@ SET(ABF_SOURCES
 set(EXTENSION_SOURCES 
     src/pbix_extension.cpp
     src/pbix_scanner.cpp
+    src/pbix_reader.cpp
     src/sqlite_db.cpp 
     src/sqlite_stmt.cpp
     src/sqlite_utils.cpp

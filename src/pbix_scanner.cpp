@@ -78,10 +78,9 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 
 	
 	ColumnList columns;
-	vector<unique_ptr<Constraint>> constraints;
+	// vector<unique_ptr<Constraint>> constraints;
 
-	result->all_varchar = false;
-	db.GetTableInfo(result->table_name, columns, constraints, result->all_varchar);
+	db.GetTableInfo(result->table_name, columns/*, constraints*/);
 	for (auto &column : columns.Logical()) {
 		names.push_back(column.GetName());
 		return_types.push_back(column.GetType());

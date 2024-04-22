@@ -4,6 +4,7 @@
 #include "duckdb.hpp"
 
 #include "pbix_scanner.hpp"
+#include "pbix_reader.hpp"
 #include "pbix_extension.hpp"
 
 #include "duckdb/catalog/catalog.hpp"
@@ -12,6 +13,7 @@
 
 using namespace duckdb;
 
+
 extern "C"
 {
 
@@ -19,6 +21,8 @@ extern "C"
     {
         PbixScanFunction pbix_fun;
         ExtensionUtil::RegisterFunction(db, pbix_fun);
+        PbixReadFunction pbix_read_fun;
+        ExtensionUtil::RegisterFunction(db, pbix_read_fun);
         auto &config = DBConfig::GetConfig(db);
 	    config.AddExtensionOption("pbix_magic_number", "A magic number to accelerate file parsing", LogicalType::INTEGER);
     }
