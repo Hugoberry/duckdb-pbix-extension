@@ -49,11 +49,13 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 };
 
 
-static SQLiteDB ExtractDB(ClientContext &context, const string &path, int trailing_chunks) {
+
+static void ExtractDB(ClientContext &context, const string &path, int trailing_chunks, SQLiteDB &db, std::vector<VertipaqFile> &vertipaqFiles) {
 
 	SQLiteOpenOptions options;
-	auto [sqliteBuffer,vertipaqFiles] = AbfParser::get_sqlite(context, path, trailing_chunks);
-	return SQLiteDB::OpenFromBuffer(options, sqliteBuffer);
+	auto [sqliteBuffer,vertipaqFilesExtracted] = AbfParser::get_sqlite(context, path, trailing_chunks);
+	db =  SQLiteDB::OpenFromBuffer(options, sqliteBuffer);
+	vertipaqFiles=vertipaqFilesExtracted;
 
 }
 
@@ -73,7 +75,7 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 	SQLiteDB db;
 	SQLiteOpenOptions options;
 	options.access_mode = AccessMode::READ_ONLY;
-	db = ExtractDB(context, result->file_name, result->trailing_chunks);
+	ExtractDB(context, result->file_name, result->trailing_chunks,db,result->vertipaq_files);
 
 	ColumnList columns;
 	db.GetMetaTableInfo(result->table_name, columns);
@@ -115,7 +117,8 @@ static void PbixInitInternal(ClientContext &context, const PbixBindData &bind_da
 				trailing_chunks = IntegerValue::Get(pbix_magic_number);
 		}
 
-		local_state.owned_db = ExtractDB(context, bind_data.file_name.c_str(),trailing_chunks);
+		std::vector<VertipaqFile> vertipaq_files;
+		ExtractDB(context, bind_data.file_name.c_str(),trailing_chunks,local_state.owned_db,vertipaq_files);
 		local_state.db = &local_state.owned_db;
 	}
 
@@ -235,20 +238,6 @@ static void PbixRead(ClientContext &context, TableFunctionInput &data, DataChunk
 					stmt.CheckTypeMatches(bind_data, val, sqlite_column_type, SQLITE_TEXT, col_idx);
 					FlatVector::GetData<string_t>(out_vec)[out_idx] = StringVector::AddString(
 					    out_vec, (const char *)sqlite3_value_text(val), sqlite3_value_bytes(val));
-					break;
-				case LogicalTypeId::DATE:
-					stmt.CheckTypeMatches(bind_data, val, sqlite_column_type, SQLITE_TEXT, col_idx);
-					FlatVector::GetData<date_t>(out_vec)[out_idx] =
-					    Date::FromCString((const char *)sqlite3_value_text(val), sqlite3_value_bytes(val));
-					break;
-				case LogicalTypeId::TIMESTAMP:
-					stmt.CheckTypeMatches(bind_data, val, sqlite_column_type, SQLITE_TEXT, col_idx);
-					FlatVector::GetData<timestamp_t>(out_vec)[out_idx] =
-					    Timestamp::FromCString((const char *)sqlite3_value_text(val), sqlite3_value_bytes(val));
-					break;
-				case LogicalTypeId::BLOB:
-					FlatVector::GetData<string_t>(out_vec)[out_idx] = StringVector::AddStringOrBlob(
-					    out_vec, (const char *)sqlite3_value_blob(val), sqlite3_value_bytes(val));
 					break;
 				default:
 					throw std::runtime_error(out_vec.GetType().ToString());

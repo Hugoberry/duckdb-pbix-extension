@@ -1,15 +1,18 @@
 #pragma once
 
 #include "duckdb.hpp"
+#include "abf_parser.h"
 
 namespace duckdb
 {
+
 	class SQLiteDB;
 
 	struct PbixBindData : public TableFunctionData
 	{
 		string file_name;
 		string table_name;
+		std::vector<VertipaqFile> vertipaq_files;
 		int8_t trailing_chunks;
 
 		vector<string> names;

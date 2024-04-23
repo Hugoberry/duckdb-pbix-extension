@@ -8,6 +8,7 @@
 
 using namespace duckdb;
 
+
 class PbixExtension : public Extension {
 public:
 	std::string Name() override {
