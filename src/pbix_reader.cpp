@@ -53,17 +53,6 @@ static SQLiteDB ExtractDB(ClientContext &context, const string &path, int traili
 
 	SQLiteOpenOptions options;
 	auto [sqliteBuffer,vertipaqFiles] = AbfParser::get_sqlite(context, path, trailing_chunks);
-	// std::cout << "ExtractDB: " << sqliteBuffer.size() << std::endl;
-	// std::cout << "backup_log: " << backup_log.size() << std::endl;
-	// //cout every backup log file
-	// for (auto &log : backup_log) {
-	// 	std::cout << "FileName: " << log.FileName << std::endl;
-	// 	std::cout << "Path: " << log.Path << std::endl;
-	// 	std::cout << "Size: " << log.Size << std::endl;
-	// 	std::cout << "StoragePath: " << log.StoragePath << std::endl;
-	// 	std::cout << "m_cbOffsetHeader: " << log.m_cbOffsetHeader << std::endl;
-	// 	std::cout << "==========================================" << std::endl;
-	// }
 	return SQLiteDB::OpenFromBuffer(options, sqliteBuffer);
 
 }
