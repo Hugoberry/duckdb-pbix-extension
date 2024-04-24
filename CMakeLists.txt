@@ -9,11 +9,17 @@ set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 
 
+set(STRING_ENCODING_TYPE "ICONV" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
+add_definitions(-DKS_STR_ENCODING_ICONV)
+
+
 project(${TARGET_NAME})
 include_directories(src/include)
 include_directories(third_party/sqlite)
 include_directories(third_party/tinyxml2)
 include_directories(third_party/xpress9)
+include_directories(third_party/kaitai)
+include_directories(third_party)
 include_directories(src/abf)
 
 set(SQLITE_SOURCES
@@ -28,6 +34,9 @@ set(XPRESS9_SOURCES
     third_party/xpress9/Xpress9DecLz77.c
     third_party/xpress9/Xpress9Misc.c
     third_party/xpress9/Xpress9Wrapper.cpp)
+
+set(KAITAI_SOURCES
+    third_party/kaitai/kaitaistream.cpp)
 
 SET(ABF_SOURCES
     src/abf/abf_parser.cpp
@@ -50,6 +59,11 @@ set(EXTENSION_SOURCES
     src/sqlite_db.cpp 
     src/sqlite_stmt.cpp
     src/sqlite_utils.cpp
+    src/vertipaq_decoder.cpp
+    src/column_data_idfmeta.cpp
+    src/column_data_idf.cpp
+    src/column_data_dictionary.cpp
+    ${KAITAI_SOURCES}
     ${SQLITE_SOURCES}
     ${TINYXML2_SOURCES}
     ${XPRESS9_SOURCES}

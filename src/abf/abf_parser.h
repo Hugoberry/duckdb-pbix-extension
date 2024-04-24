@@ -16,27 +16,7 @@
 #include "crc32.h"
 #include "duckdb.hpp"
 #include "zip_utils.h"
-
-
-
-// Constants related to ZIP file parsing
-constexpr unsigned char ZIP_LOCAL_FILE_HEADER_FIXED = 26;
-constexpr unsigned char ZIP_LOCAL_FILE_HEADER = 30;
-constexpr unsigned char ABF_XPRESS9_SIGNATURE = 102;
-constexpr unsigned char ABF_BACKUP_LOG_HEADER_OFFSET = 72;
-constexpr uint32_t BLOCK_SIZE = 0x200000;
-constexpr unsigned short ABF_BACKUP_LOG_HEADER_SIZE = 0x1000 - ABF_BACKUP_LOG_HEADER_OFFSET;
-static constexpr idx_t FILE_READ = idx_t(1 << 0);
-
-struct VertipaqFile
-{
-    std::string Path;
-    std::string FileName;
-    std::string StoragePath;
-    uint64_t Size;
-    uint64_t m_cbOffsetHeader;
-};
-
+#include "vertipaq_meta.hpp"
 
 class AbfParser {
 public:

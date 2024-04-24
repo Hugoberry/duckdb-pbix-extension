@@ -48,8 +48,6 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 	}
 };
 
-
-
 static void ExtractDB(ClientContext &context, const string &path, int trailing_chunks, SQLiteDB &db, std::vector<VertipaqFile> &vertipaqFiles) {
 
 	SQLiteOpenOptions options;
@@ -195,6 +193,46 @@ static void PbixRead(ClientContext &context, TableFunctionInput &data, DataChunk
 	auto &gstate = data.global_state->Cast<PbixGlobalState>();
 	auto &bind_data = data.bind_data->Cast<PbixBindData>();
 
+
+    VertipaqData columnData;
+	VertipaqFiles vertipaq_files;
+
+	//put the vector from bind_data into the vertipaq_files map
+	for (auto &vfile : bind_data.vertipaq_files) {
+		vertipaq_files[vfile.FileName] = vfile;
+	}
+
+	auto step =0;
+
+    while (true) {
+        auto &stmt = state.stmt;
+        auto has_more = stmt.Step();
+        if (!has_more) {
+            break; // Finished processing all rows
+        }
+
+		std::string columnName = (const char*)sqlite3_value_text(stmt.GetValue<sqlite3_value*>(1));
+
+		// Handle NULL values by checking before constructing std::string
+		const char* dictionary = reinterpret_cast<const char*>(sqlite3_value_text(stmt.GetValue<sqlite3_value*>(3)));
+		const char* hidx = reinterpret_cast<const char*>(sqlite3_value_text(stmt.GetValue<sqlite3_value*>(4)));
+		const char* idf = reinterpret_cast<const char*>(sqlite3_value_text(stmt.GetValue<sqlite3_value*>(5)));
+
+		VertipaqDetails details = {
+			sqlite3_value_int64(stmt.GetValue<sqlite3_value*>(2)),
+			dictionary ? std::string(dictionary) : "", // Use empty string if NULL
+			hidx ? std::string(hidx) : "", // Use empty string if NULL
+			idf ? std::string(idf) : "", // Use empty string if NULL
+			sqlite3_value_int64(stmt.GetValue<sqlite3_value*>(6)),
+			sqlite3_value_int64(stmt.GetValue<sqlite3_value*>(7)),
+			sqlite3_value_int64(stmt.GetValue<sqlite3_value*>(8)),
+			sqlite3_value_double(stmt.GetValue<sqlite3_value*>(9)),
+		};
+		VertipaqDecoder::processVertipaqData(context, bind_data.file_name, details,vertipaq_files);
+        columnData[columnName] = details;
+    }
+
+	/*
 	while (output.size() == 0) {
 		if (state.done) {
 			if (!PbixParallelStateNext(context, bind_data, state, gstate)) {
@@ -245,7 +283,7 @@ static void PbixRead(ClientContext &context, TableFunctionInput &data, DataChunk
 			}
 			out_idx++;
 		}
-	}
+	}*/
 }
 
 
