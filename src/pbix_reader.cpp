@@ -48,13 +48,13 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 	}
 };
 
-static void ExtractDB(ClientContext &context, const string &path, int trailing_chunks, SQLiteDB &db, std::vector<VertipaqFile> &vertipaqFiles) {
+static void ExtractDB(ClientContext &context, const string &path, int trailing_chunks, SQLiteDB &db, std::vector<VertipaqFile> &vertipaqFiles, bool &dm_error) {
 
 	SQLiteOpenOptions options;
-	auto [sqliteBuffer,vertipaqFilesExtracted] = AbfParser::get_sqlite(context, path, trailing_chunks);
-	db =  SQLiteDB::OpenFromBuffer(options, sqliteBuffer);
-	vertipaqFiles=vertipaqFilesExtracted;
-
+	auto dataModel = AbfParser::get_sqlite(context, path, trailing_chunks);
+	db =  SQLiteDB::OpenFromBuffer(options, dataModel.metadata_db);
+	vertipaqFiles = dataModel.vertipaq_files;
+	dm_error = dataModel.error_code;
 }
 
 static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBindInput &input,
@@ -73,7 +73,7 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 	SQLiteDB db;
 	SQLiteOpenOptions options;
 	options.access_mode = AccessMode::READ_ONLY;
-	ExtractDB(context, result->file_name, result->trailing_chunks,db,result->vertipaq_files);
+	ExtractDB(context, result->file_name, result->trailing_chunks,db,result->vertipaq_files, result->data_model_error);
 
 	ColumnList columns;
 	db.GetMetaTableInfo(result->table_name, columns);
@@ -116,7 +116,8 @@ static void PbixInitInternal(ClientContext &context, const PbixBindData &bind_da
 		}
 
 		std::vector<VertipaqFile> vertipaq_files;
-		ExtractDB(context, bind_data.file_name.c_str(),trailing_chunks,local_state.owned_db,vertipaq_files);
+		bool error_code;
+		ExtractDB(context, bind_data.file_name.c_str(),trailing_chunks,local_state.owned_db,vertipaq_files, error_code);
 		local_state.db = &local_state.owned_db;
 	}
 
@@ -228,7 +229,7 @@ static void PbixRead(ClientContext &context, TableFunctionInput &data, DataChunk
 			sqlite3_value_int64(stmt.GetValue<sqlite3_value*>(8)),
 			sqlite3_value_double(stmt.GetValue<sqlite3_value*>(9)),
 		};
-		VertipaqDecoder::processVertipaqData(context, bind_data.file_name, details,vertipaq_files);
+		VertipaqDecoder::processVertipaqData(context, bind_data.file_name, details,vertipaq_files, bind_data.data_model_error);
         columnData[columnName] = details;
     }
 

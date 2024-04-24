@@ -27,18 +27,18 @@ std::vector<uint8_t> AbfParser::trim_buffer(const std::vector<uint8_t> &buffer)
     return trimmed_buffer;
 }
 
-std::tuple<uint64_t, int> AbfParser::process_backup_log_header(const std::vector<uint8_t> &buffer)
+BackupLogHeader AbfParser::process_backup_log_header(const std::vector<uint8_t> &buffer)
 {
 
     std::vector<uint8_t> backup_log_header_buffer = read_buffer_bytes(buffer, ABF_BACKUP_LOG_HEADER_OFFSET, ABF_BACKUP_LOG_HEADER_SIZE);
     backup_log_header_buffer = trim_buffer(backup_log_header_buffer);
-    BackupLogHeader backup_log_header = BackupLogHeader::from_xml(backup_log_header_buffer, "UTF-16");
-    return {backup_log_header.m_cbOffsetHeader, backup_log_header.DataSize};
+    return BackupLogHeader::from_xml(backup_log_header_buffer, "UTF-16");
+
 }
 
-std::tuple<std::vector<uint8_t>, std::vector<VertipaqFile>>  AbfParser::extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, uint64_t virtual_directory_offset, int virtual_directory_size)
+DataModel AbfParser::extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, BackupLogHeader virtual_dir)
 {
-    std::vector<uint8_t> virtual_directory_buffer = read_buffer_bytes(buffer, virtual_directory_offset - skip_offset, virtual_directory_size);
+    std::vector<uint8_t> virtual_directory_buffer = read_buffer_bytes(buffer, virtual_dir.m_cbOffsetHeader - skip_offset, virtual_dir.DataSize);
     VirtualDirectory virtual_directory = VirtualDirectory::from_xml(virtual_directory_buffer, "UTF-8");
 
     // Validate the presence of backup files before proceeding.
@@ -64,7 +64,13 @@ std::tuple<std::vector<uint8_t>, std::vector<VertipaqFile>>  AbfParser::extract_
     uint64_t sqlite_offset = sqlite.m_cbOffsetHeader;
     int sqlite_size = sqlite.Size;
 
-    return {read_buffer_bytes(buffer, sqlite_offset - skip_offset, sqlite_size), match_logs_and_get_vertipaq_meta(backup_log, virtual_directory)};
+    DataModel data_model= {
+        read_buffer_bytes(buffer, sqlite_offset - skip_offset, sqlite_size),
+        match_logs_and_get_vertipaq_meta(backup_log, virtual_directory),
+        virtual_dir.ErrorCode
+    };
+
+    return data_model;
 }
 
 
@@ -169,11 +175,11 @@ std::vector<uint8_t> AbfParser::decompress_initial_block(duckdb::FileHandle &fil
     return decompressed_buffer;
 }
 
-std::vector<uint8_t> AbfParser::iterate_and_decompress_blocks(duckdb::FileHandle &file_handle_p, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, uint64_t virtual_directory_offset, int virtual_directory_size, const int trailing_blocks, uint64_t &skip_offset)
+std::vector<uint8_t> AbfParser::iterate_and_decompress_blocks(duckdb::FileHandle &file_handle_p, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, BackupLogHeader virtual_directory, const int trailing_blocks, uint64_t &skip_offset)
 {
     // Calculate the total number of blocks
 
-    auto total_blocks = (virtual_directory_size + virtual_directory_offset) / BLOCK_SIZE;
+    auto total_blocks = (virtual_directory.DataSize + virtual_directory.m_cbOffsetHeader) / BLOCK_SIZE;
 
     std::vector<uint8_t> all_decompressed_data;
     uint32_t block_index = 0;
@@ -228,7 +234,7 @@ std::vector<uint8_t> AbfParser::iterate_and_decompress_blocks(duckdb::FileHandle
     return all_decompressed_data;
 }
 
-std::tuple<std::vector<uint8_t>, std::vector<VertipaqFile>>  AbfParser::get_sqlite(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks = 15)
+DataModel  AbfParser::get_sqlite(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks = 15)
 {
     auto &fs = duckdb::FileSystem::GetFileSystem(context);
     // Open the file using FileSystem
@@ -273,19 +279,19 @@ std::tuple<std::vector<uint8_t>, std::vector<VertipaqFile>>  AbfParser::get_sqli
     auto initial_decompressed_buffer = decompress_initial_block(*file_handle, bytes_read, xpress9_wrapper);
 
     // Process backup log header to get virtual directory offset and size
-    auto [virtual_directory_offset, virtual_directory_size] = process_backup_log_header(initial_decompressed_buffer);
+    auto backup_log_header = process_backup_log_header(initial_decompressed_buffer);
 
     uint64_t skip_offset = 0; // optimization for skipping blocks
     // Iterate through the remaining blocks and decompress them
-    auto all_decompressed_buffer = iterate_and_decompress_blocks(*file_handle, bytes_read, datamodel_ofs, datamodel_size, xpress9_wrapper, virtual_directory_offset, virtual_directory_size, trailing_blocks, skip_offset);
+    auto all_decompressed_buffer = iterate_and_decompress_blocks(*file_handle, bytes_read, datamodel_ofs, datamodel_size, xpress9_wrapper, backup_log_header, trailing_blocks, skip_offset);
 
     // Prefix all_decompressed_buffer with initial_decompressed_buffer in case we have only one block
     all_decompressed_buffer.insert(all_decompressed_buffer.begin(), initial_decompressed_buffer.begin(), initial_decompressed_buffer.end());
 
-    if (skip_offset + all_decompressed_buffer.size() < virtual_directory_offset + virtual_directory_size)
+    if (skip_offset + all_decompressed_buffer.size() < backup_log_header.m_cbOffsetHeader + backup_log_header.DataSize)
     {
         throw std::runtime_error("Could not parse the entire DataModel.");
     }
     // Finally, extract the SQLite buffer from the decompressed data
-    return extract_sqlite_buffer(all_decompressed_buffer, skip_offset, virtual_directory_offset, virtual_directory_size);
+    return extract_sqlite_buffer(all_decompressed_buffer, skip_offset, backup_log_header);
 }

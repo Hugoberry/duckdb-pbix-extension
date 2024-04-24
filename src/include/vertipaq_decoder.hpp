@@ -22,9 +22,9 @@ namespace duckdb
     public:
         static std::vector<int> readBitPacked(const std::vector<uint64_t>& sub_segment, int bit_width, int min_data_id);
         static std::vector<std::string> extractStrings(std::istream &stream);
-        static std::vector<int> readRLEBitPackedHybrid(std::istringstream &stream, int entries, int min_data_id, int bit_width);
+        static std::vector<int> readRLEBitPackedHybrid(kaitai::kstream& ks, int entries, int min_data_id, int bit_width);
         static std::map<int, std::string> readDictionary(std::istream &stream, int minDataId);
 
-        static void processVertipaqData(ClientContext &context, const std::string &path, VertipaqDetails &details, VertipaqFiles &vfiles);
+        static void processVertipaqData(ClientContext &context, const std::string &path, VertipaqDetails &details, VertipaqFiles &vfiles, const bool error_code);
     };
 } // namespace duckdb

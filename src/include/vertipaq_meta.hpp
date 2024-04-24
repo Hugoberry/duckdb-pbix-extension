@@ -30,6 +30,12 @@ struct IdfMetadata
 	int32_t bit_width;
 };
 
+struct DataModel{
+	std::vector<uint8_t> metadata_db; 
+	std::vector<VertipaqFile> vertipaq_files;
+	bool error_code;
+};
+
 using VertipaqFiles = std::map<std::string, VertipaqFile>;
 using VertipaqData = std::map<std::string, VertipaqDetails>;
 
