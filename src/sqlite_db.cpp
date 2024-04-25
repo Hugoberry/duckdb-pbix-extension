@@ -203,18 +203,44 @@ void SQLiteDB::GetViewInfo(const string &view_name, string &sql) {
 	throw InternalException("GetViewInfo - view \"%s\" not found", view_name);
 }
 void SQLiteDB::GetMetaTableInfo(const string &table_name, ColumnList &columns) {
+	SQLiteStatement stmt;
 
-	// columns.AddColumn(ColumnDefinition("RowId", LogicalType::BIGINT));
-	columns.AddColumn(ColumnDefinition("TableName", LogicalType::VARCHAR));
-	columns.AddColumn(ColumnDefinition("ColumnName", LogicalType::VARCHAR));
-	columns.AddColumn(ColumnDefinition("StoragePosition", LogicalType::BIGINT));
-	columns.AddColumn(ColumnDefinition("Dictionary", LogicalType::VARCHAR));
-	columns.AddColumn(ColumnDefinition("HIDX", LogicalType::VARCHAR));
-	columns.AddColumn(ColumnDefinition("IDF", LogicalType::VARCHAR));
-	columns.AddColumn(ColumnDefinition("Cardinality", LogicalType::BIGINT));
-	columns.AddColumn(ColumnDefinition("DataType", LogicalType::BIGINT));
-	columns.AddColumn(ColumnDefinition("BaseId", LogicalType::BIGINT));
-	columns.AddColumn(ColumnDefinition("Magnitude", LogicalType::DOUBLE));
+	idx_t primary_key_index = idx_t(-1);
+	vector<string> primary_keys;
+
+	bool found = false;
+
+	stmt = Prepare(StringUtil::Format("SELECT c.ExplicitName,sfd.FileName,sfi.FileName,c.ExplicitDataType,ds.BaseId, ds.Magnitude FROM COLUMN c JOIN [Table] t ON c.TableId = t.ID JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID LEFT JOIN DictionaryStorage ds ON ds.ID = cs.DictionaryStorageID LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID WHERE c.Type = 1 AND t.Name='%s' ORDER BY StoragePosition", SQLiteUtils::SanitizeString(table_name)));
+	while (stmt.Step()) {
+
+
+		auto vertipaq_type = sqlite3_value_int64(stmt.GetValue<sqlite3_value*>(3));
+
+		auto column_type = SQLiteUtils::VertipaqTypeToLogicalType(vertipaq_type);
+		auto sqlite_colname = (const char*)sqlite3_value_text(stmt.GetValue<sqlite3_value*>(0));
+
+
+		ColumnDefinition column(std::move(sqlite_colname), std::move(column_type));
+		columns.AddColumn(std::move(column));
+		// if (not_null) {
+		// 	constraints.push_back(make_uniq<NotNullConstraint>(LogicalIndex(cid)));
+		// }
+		found = true;
+	}
+	if (!found) {
+		throw InternalException("GetTableInfo - table \"%s\" not found", table_name);
+	}
+
+	// columns.AddColumn(ColumnDefinition("TableName", LogicalType::VARCHAR));
+	// columns.AddColumn(ColumnDefinition("ColumnName", LogicalType::VARCHAR));
+	// columns.AddColumn(ColumnDefinition("StoragePosition", LogicalType::BIGINT));
+	// columns.AddColumn(ColumnDefinition("Dictionary", LogicalType::VARCHAR));
+	// columns.AddColumn(ColumnDefinition("HIDX", LogicalType::VARCHAR));
+	// columns.AddColumn(ColumnDefinition("IDF", LogicalType::VARCHAR));
+	// columns.AddColumn(ColumnDefinition("Cardinality", LogicalType::BIGINT));
+	// columns.AddColumn(ColumnDefinition("DataType", LogicalType::BIGINT));
+	// columns.AddColumn(ColumnDefinition("BaseId", LogicalType::BIGINT));
+	// columns.AddColumn(ColumnDefinition("Magnitude", LogicalType::DOUBLE));
 
 }
 

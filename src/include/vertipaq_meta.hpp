@@ -15,9 +15,7 @@ struct VertipaqDetails
 {
 	int64_t StoragePosition;
 	std::string Dictionary;
-	std::string HIDX;
 	std::string IDF;
-	int64_t Cardinality;
 	int64_t DataType;
 	int64_t BaseId;
 	double Magnitude;
