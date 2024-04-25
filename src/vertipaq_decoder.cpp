@@ -2,10 +2,10 @@
 #include <iostream>
 namespace duckdb
 {
-    std::vector<int> VertipaqDecoder::readBitPacked(const std::vector<uint64_t> &sub_segment, int bit_width, int min_data_id)
+    std::vector<uint64_t> VertipaqDecoder::readBitPacked(const std::vector<uint64_t> &sub_segment, uint64_t bit_width, uint64_t min_data_id)
     {
-        int mask = (1 << bit_width) - 1;
-        std::vector<int> res;
+        uint64_t mask = (1 << bit_width) - 1;
+        std::vector<uint64_t> res;
         for (auto u8le : sub_segment)
         {
             for (int i = 0; i < 64 / bit_width; i++)
@@ -17,23 +17,125 @@ namespace duckdb
         return res;
     }
 
-    std::vector<std::string> VertipaqDecoder::extractStrings(std::istream &stream)
+    std::map<uint64_t, std::string> VertipaqDecoder::readDictionary(std::string &dictionary_stream, uint64_t min_data_id)
     {
-        std::vector<std::string> strings;
-        std::string temp;
-        while (std::getline(stream, temp, '\0'))
+
+        std::istringstream is_d(dictionary_stream);
+        kaitai::kstream ks_d(&is_d);
+        column_data_dictionary_t dictionary(&ks_d);
+
+        // Checking dictionary type and processing accordingly
+        if (dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_STRING)
         {
-            if (!temp.empty())
-                strings.push_back(temp);
+            // Handling string-based dictionary
+            std::map<uint64_t, std::string> hashtable;
+
+            // Assuming there's only one dictionary page for simplification
+            auto stringData = static_cast<column_data_dictionary_t::string_data_t *>(dictionary.data());
+            auto page = stringData->dictionary_pages();
+            std::string uncompressed = page->string_store()->uncompressed_character_buffer();
+
+            // Extracting strings and filling the hashtable
+            std::istringstream ss(uncompressed);
+            std::string token;
+            int index = min_data_id;
+            while (std::getline(ss, token, '\0'))
+            { // assuming null-terminated strings in buffer
+                hashtable[index++] = token;
+            }
+
+            std::cout << "STR  Dictionary size: " << hashtable.size() << std::endl;
+            return hashtable;
         }
-        return strings;
+        else if (dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_LONG ||
+                 dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_REAL)
+        {
+            // Handling numeric data
+            std::map<uint64_t, double> values;
+            auto numberData = static_cast<column_data_dictionary_t::number_data_t *>(dictionary.data());
+            auto vector_info = numberData->vector_of_vectors_info();
+            const auto &vals = vector_info->values();
+            int index = min_data_id;
+            for (double val : *vals)
+            {
+                values[index++] = val;
+            }
+
+            // Converting to string map for a unified interface (if needed)
+            std::map<uint64_t, std::string> str_values;
+            for (const auto &pair : values)
+            {
+                str_values[pair.first] = std::to_string(pair.second);
+            }
+
+            std::cout << "REAL Dictionary size: " << str_values.size() << std::endl;
+            return str_values;
+        }
     }
 
-    // std::vector<int> VertipaqDecoder::readRLEBitPackedHybrid(kaitai::kstream ks, int entries, int min_data_id, int bit_width)
-    // {
+    std::vector<uint64_t> VertipaqDecoder::readRLEBitPackedHybrid(std::string &idf_stream, uint64_t entries, uint64_t min_data_id, uint64_t bit_width)
+    {
+        std::istringstream stream(idf_stream);
+        kaitai::kstream ks_idf(&stream);
+        // auto result = readRLEBitPackedHybrid(ks_idf, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
+        column_data_idf_t column_data(&ks_idf);
 
-    //     return vector;
-    // }
+        std::vector<uint64_t> bitpacked_values;
+        std::vector<uint64_t> vector;
+        uint64_t bit_packed_entries = 0;
+        uint64_t bit_packed_offset = 0;
+
+        if (entries > 0 && !column_data.segments()->empty())
+        {
+            auto &segments = *column_data.segments();
+            auto segment = segments[0]; // Assuming there is at least one segment
+            uint64_t size = segment->sub_segment_size();
+            if (segment->sub_segment()->back() == 0 && size == 1)
+            {
+                bitpacked_values.assign(entries, min_data_id);
+            }
+            else
+            {
+                // Assuming `sub_segment` is accessible and contains meaningful data
+                const auto &sub_segment = *segment->sub_segment();
+                bitpacked_values = readBitPacked(sub_segment, bit_width, min_data_id);
+            }
+        }
+
+        if (!column_data.segments()->empty())
+        {
+            const auto &primary_segment = *column_data.segments()->at(0)->primary_segment();
+            for (const auto &entry : primary_segment)
+            {
+                if (entry->data_value() + bit_packed_offset == 0xFFFFFFFF)
+                { // bit pack marker
+                    bit_packed_entries = entry->repeat_value();
+                    auto begin_it = bitpacked_values.begin() + bit_packed_offset;
+                    auto end_it = begin_it + bit_packed_entries;
+                    vector.insert(vector.end(), begin_it, end_it);
+                    bit_packed_offset += bit_packed_entries;
+                }
+                else
+                {
+                    std::vector<uint64_t> rle(entry->repeat_value(), entry->data_value());
+                    vector.insert(vector.end(), rle.begin(), rle.end());
+                }
+            }
+        }
+
+        return vector;
+    }
+
+    IdfMetadata VertipaqDecoder::readIdfMetadata(std::string &stream)
+    {
+        std::istringstream is(stream);
+        kaitai::kstream ks(&is);
+        column_data_idfmeta_t idf_meta(&ks);
+        return IdfMetadata{
+            idf_meta.blocks()->cp()->cs()->ss()->min_data_id(),
+            idf_meta.blocks()->cp()->cs()->cs()->count_bit_packed(),
+            idf_meta.bit_width()};
+    }
 
     void VertipaqDecoder::processVertipaqData(ClientContext &context, const std::string &path, VertipaqDetails &details, VertipaqFiles &vfiles, const bool error_code)
     {
@@ -105,135 +207,39 @@ namespace duckdb
             }
             all_decompressed_data.insert(all_decompressed_data.end(), decompressed_buffer.begin(), decompressed_buffer.end());
         }
+
         // append 'meta' to IDF
         std::string idf_metadata = details.IDF + "meta";
-        // read from the decompressed with offset and size from details
         std::string idf_meta_stream(all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader + vfiles[idf_metadata].Size);
-
         std::istringstream is(idf_meta_stream);
-        kaitai::kstream ks(&is);
-        column_data_idfmeta_t idf_meta(&ks);
-        IdfMetadata idf_m = {
-            idf_meta.blocks()->cp()->cs()->ss()->min_data_id(),
-            idf_meta.blocks()->cp()->cs()->cs()->count_bit_packed(),
-            idf_meta.bit_width()};
-        ks.close();
+        IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
 
         // if Dictionary is not empty, read the dictionary
         if (!details.Dictionary.empty())
         {
             std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
-            // auto dictionary = readDictionary(dictionary_stream, details.BaseId);
-            std::istringstream is_d(dictionary_stream);
-            kaitai::kstream ks_d(&is_d);
-            column_data_dictionary_t dictionary(&ks_d);
-
-            // Checking dictionary type and processing accordingly
-            if (dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_STRING)
+            auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
+            //print dictiinary
+            for (const auto &pair : dictionary)
             {
-                // Handling string-based dictionary
-                std::unordered_map<int, std::string> hashtable;
-
-                // Assuming there's only one dictionary page for simplification
-                auto stringData = static_cast<column_data_dictionary_t::string_data_t *>(dictionary.data());
-                auto page = stringData->dictionary_pages();
-                std::string uncompressed = page->string_store()->uncompressed_character_buffer();
-
-                // Extracting strings and filling the hashtable
-                std::istringstream ss(uncompressed);
-                std::string token;
-                int index = idf_m.min_data_id;
-                while (std::getline(ss, token, '\0'))
-                { // assuming null-terminated strings in buffer
-                    hashtable[index++] = token;
-                }
-
-                std::cout << "STR  Dictionary size: " << hashtable.size() << std::endl;
-                // return hashtable;
+                std::cout << pair.first << " : " << pair.second << std::endl;
             }
-            else if (dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_LONG ||
-                     dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_REAL)
-            {
-                // Handling numeric data
-                std::unordered_map<int, double> values;
-                auto numberData = static_cast<column_data_dictionary_t::number_data_t *>(dictionary.data());
-                auto vector_info = numberData->vector_of_vectors_info();
-                const auto &vals = vector_info->values();
-                int index = idf_m.min_data_id;
-                for (double val : *vals)
-                {
-                    values[index++] = val;
-                }
-
-                // Converting to string map for a unified interface (if needed)
-                std::unordered_map<int, std::string> str_values;
-                for (const auto &pair : values)
-                {
-                    str_values[pair.first] = std::to_string(pair.second);
-                }
-
-                std::cout << "REAL Dictionary size: " << str_values.size() << std::endl;
-                // return str_values;
-            }
-            // ks_d.close();
         }
         // read IDF
-        auto  correction =  error_code ? 4: 0;
-        std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size-correction);
-        std::istringstream stream(idf_stream);
-        kaitai::kstream ks_idf(&stream);
-        // auto result = readRLEBitPackedHybrid(ks_idf, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
-        column_data_idf_t column_data(&ks_idf);
+        auto correction = error_code ? 4 : 0;
+        std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size - correction);
 
-        std::vector<int> bitpacked_values;
-        std::vector<int> vector;
-        int bit_packed_entries = 0;
-        int bit_packed_offset = 0;
+        auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
 
-        if (idf_m.count_bit_packed > 0 && !column_data.segments()->empty())
-        {
-            auto &segments = *column_data.segments();
-            auto segment = segments[0]; // Assuming there is at least one segment
-            int size = segment->sub_segment_size();
-            if (segment->sub_segment()->back() == 0 && size == 1)
-            {
-                bitpacked_values.assign(idf_m.count_bit_packed, idf_m.min_data_id);
-            }
-            else
-            {
-                // Assuming `sub_segment` is accessible and contains meaningful data
-                const auto &sub_segment = *segment->sub_segment();
-                bitpacked_values = readBitPacked(sub_segment, idf_m.bit_width, idf_m.min_data_id);
-            }
-        }
-
-        if (!column_data.segments()->empty())
-        {
-            const auto &primary_segment = *column_data.segments()->at(0)->primary_segment();
-            for (const auto &entry : primary_segment)
-            {
-                if (entry->data_value() + bit_packed_offset == 0xFFFFFFFF)
-                { // bit pack marker
-                    bit_packed_entries = entry->repeat_value();
-                    auto begin_it = bitpacked_values.begin() + bit_packed_offset;
-                    auto end_it = begin_it + bit_packed_entries;
-                    vector.insert(vector.end(), begin_it, end_it);
-                    bit_packed_offset += bit_packed_entries;
-                }
-                else
-                {
-                    std::vector<int> rle(entry->repeat_value(), entry->data_value());
-                    vector.insert(vector.end(), rle.begin(), rle.end());
-                }
-            }
-        }
-        // ks_idf.close();
         // print all of the values
         for (int i = 0; i < vector.size(); i++)
         {
             std::cout << vector[i] << " ";
         }
         std::cout << std::endl;
-        std::cout << "IDF size: " << vector.size() << std::endl;
+        //     return pd.Series(self._read_rle_bit_packed_hybrid(data_slice, meta['count_bit_packed'], meta['min_data_id'], meta['bit_width'])).map(dictionary)
+        // elif pd.notnull(column_metadata["HIDX"]):
+        //     data_slice = get_data_slice(self._data_model,column_metadata["IDF"])
+        //     return pd.Series(self._read_rle_bit_packed_hybrid(data_slice, meta['count_bit_packed'], meta['min_data_id'], meta['bit_width'])).add(column_metadata["BaseId"]) / column_metadata["Magnitude"]
     }
 } // namespace duckdb
