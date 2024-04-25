@@ -120,12 +120,14 @@ LogicalType SQLiteUtils::VertipaqTypeToLogicalType(const uint8_t &vertipaq_type)
 	switch (vertipaq_type) {
 	case 2:
 		return LogicalType::VARCHAR;
-	case 8:
+	case 6:
 		return LogicalType::BIGINT;
+	case 8:
+		return LogicalType::DOUBLE;
 	case 9:
 		return LogicalType::TIMESTAMP;
 	case 10:
-		return LogicalType::DECIMAL(16,2);
+		return LogicalType::DECIMAL(16,4);
 	case 11:
 		return LogicalType::BOOLEAN;
 	case 17:
