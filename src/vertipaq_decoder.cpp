@@ -43,8 +43,6 @@ namespace duckdb
             { // assuming null-terminated strings in buffer
                 hashtable[index++] = token;
             }
-
-            std::cout << "STR  Dictionary size: " << hashtable.size() << std::endl;
             return hashtable;
         }
         else if (dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_LONG ||
@@ -67,8 +65,6 @@ namespace duckdb
             {
                 str_values[pair.first] = std::to_string(pair.second);
             }
-
-            std::cout << "REAL Dictionary size: " << str_values.size() << std::endl;
             return str_values;
         }
     }
@@ -213,33 +209,29 @@ namespace duckdb
         std::string idf_meta_stream(all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader + vfiles[idf_metadata].Size);
         std::istringstream is(idf_meta_stream);
         IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
+        std::map<uint64_t, std::string> dictionary;
 
         // if Dictionary is not empty, read the dictionary
         if (!details.Dictionary.empty())
         {
             std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
-            auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
-            //print dictiinary
-            for (const auto &pair : dictionary)
-            {
-                std::cout << pair.first << " : " << pair.second << std::endl;
-            }
+            dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
         }
         // read IDF
         auto correction = error_code ? 4 : 0;
         std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size - correction);
 
         auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
-
+        std::cout << "========================================================================================= " << std::endl;
         // print all of the values
         for (int i = 0; i < vector.size(); i++)
         {
-            std::cout << vector[i] << " ";
+            if (!details.Dictionary.empty()){
+                std::cout << dictionary[vector[i]] << " ";
+            } else {
+                std::cout << (vector[i]+details.BaseId)/details.Magnitude << " ";
+            }
         }
         std::cout << std::endl;
-        //     return pd.Series(self._read_rle_bit_packed_hybrid(data_slice, meta['count_bit_packed'], meta['min_data_id'], meta['bit_width'])).map(dictionary)
-        // elif pd.notnull(column_metadata["HIDX"]):
-        //     data_slice = get_data_slice(self._data_model,column_metadata["IDF"])
-        //     return pd.Series(self._read_rle_bit_packed_hybrid(data_slice, meta['count_bit_packed'], meta['min_data_id'], meta['bit_width'])).add(column_metadata["BaseId"]) / column_metadata["Magnitude"]
     }
 } // namespace duckdb
