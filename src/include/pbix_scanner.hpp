@@ -13,6 +13,7 @@ namespace duckdb
 		string file_name;
 		string table_name;
 		std::vector<VertipaqFile> vertipaq_files;
+		unique_ptr<FileHandle> file_handle;     
 		bool data_model_error;
 		int8_t trailing_chunks;
 

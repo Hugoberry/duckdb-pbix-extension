@@ -28,6 +28,7 @@ struct PbixLocalState : public LocalTableFunctionState {
 	SQLiteDB *db;
 	SQLiteDB owned_db;
 	SQLiteStatement stmt;
+	unique_ptr<FileHandle> file_handle;     // File handle for the pbix file
 	bool done = false;
 	vector<column_t> column_ids;
 
@@ -193,8 +194,8 @@ static void PbixRead(ClientContext &context, TableFunctionInput &data, DataChunk
 	auto &state = data.local_state->Cast<PbixLocalState>();
 	auto &gstate = data.global_state->Cast<PbixGlobalState>();
 	auto &bind_data = data.bind_data->Cast<PbixBindData>();
-
-
+    
+	VertipaqDecoder vdecoder(context, bind_data.file_name, bind_data.data_model_error);
     VertipaqData columnData;
 	VertipaqFiles vertipaq_files;
 
@@ -229,7 +230,12 @@ static void PbixRead(ClientContext &context, TableFunctionInput &data, DataChunk
 			sqlite3_value_int64(stmt.GetValue<sqlite3_value*>(8)),
 			sqlite3_value_double(stmt.GetValue<sqlite3_value*>(9)),
 		};
-		VertipaqDecoder::processVertipaqData(context, bind_data.file_name, details,vertipaq_files, bind_data.data_model_error);
+		if(dictionary){
+			auto ress = vdecoder.processVertipaqStr(details,vertipaq_files);
+		} else {
+			auto resi = vdecoder.processVertipaqInt(details,vertipaq_files);
+		}
+
         columnData[columnName] = details;
     }
 

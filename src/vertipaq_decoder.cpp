@@ -133,10 +133,10 @@ namespace duckdb
             idf_meta.bit_width()};
     }
 
-    void VertipaqDecoder::processVertipaqData(ClientContext &context, const std::string &path, VertipaqDetails &details, VertipaqFiles &vfiles, const bool error_code)
+    VertipaqDecoder::VertipaqDecoder(ClientContext &context, const std::string &path, const bool error_code)
     {
-        auto &fs = duckdb::FileSystem::GetFileSystem(context);
-        // Open the file using FileSystem
+        this->error_code = error_code;
+        auto &fs = FileSystem::GetFileSystem(context);
         auto file_handle = fs.OpenFile(path, FILE_READ);
         if (!file_handle)
         {
@@ -177,7 +177,6 @@ namespace duckdb
 
         bytes_read += ABF_XPRESS9_SIGNATURE;
 
-        std::vector<uint8_t> all_decompressed_data;
         while (bytes_read < datamodel_size)
         {
             uint32_t uncompressed_size;
@@ -203,35 +202,59 @@ namespace duckdb
             }
             all_decompressed_data.insert(all_decompressed_data.end(), decompressed_buffer.begin(), decompressed_buffer.end());
         }
+    }
 
-        // append 'meta' to IDF
+    std::vector<std::string> VertipaqDecoder::processVertipaqStr(VertipaqDetails &details, VertipaqFiles &vfiles)
+    {
+
+        if (details.Dictionary.empty())
+        {
+            throw std::runtime_error("Dictionary is empty");
+        }
+        // append 'meta' to IDF filename
+        std::string idf_metadata = details.IDF + "meta";
+        std::string idf_meta_stream(all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader + vfiles[idf_metadata].Size);
+        std::istringstream is(idf_meta_stream);
+        IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
+        // read dictionary file
+        std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
+        auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
+        // read IDF
+        auto correction = error_code ? 4 : 0;
+        std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size - correction);
+
+        auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
+
+        std::vector<std::string> output;
+        for (int i = 0; i < vector.size(); i++)
+        {
+            output.push_back(dictionary[vector[i]]);
+        }
+        return output;
+    }
+
+    std::vector<uint64_t> VertipaqDecoder::processVertipaqInt(VertipaqDetails &details, VertipaqFiles &vfiles)
+    {
+
+        // append 'meta' to IDF filename
         std::string idf_metadata = details.IDF + "meta";
         std::string idf_meta_stream(all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader + vfiles[idf_metadata].Size);
         std::istringstream is(idf_meta_stream);
         IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
         std::map<uint64_t, std::string> dictionary;
 
-        // if Dictionary is not empty, read the dictionary
-        if (!details.Dictionary.empty())
-        {
-            std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
-            dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
-        }
         // read IDF
         auto correction = error_code ? 4 : 0;
         std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size - correction);
 
         auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
-        std::cout << "========================================================================================= " << std::endl;
-        // print all of the values
+
+        std::vector<uint64_t> output;
         for (int i = 0; i < vector.size(); i++)
         {
-            if (!details.Dictionary.empty()){
-                std::cout << dictionary[vector[i]] << " ";
-            } else {
-                std::cout << (vector[i]+details.BaseId)/details.Magnitude << " ";
-            }
+            output.push_back((vector[i] + details.BaseId) / details.Magnitude);
         }
-        std::cout << std::endl;
+
+        return output;
     }
 } // namespace duckdb
