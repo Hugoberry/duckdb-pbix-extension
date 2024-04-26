@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/duckdb", // Change this to the path of your compiled binary
-            "args": ["pbix.db"], // Any arguments your program needs
+            "args": [""], // Any arguments your program needs
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

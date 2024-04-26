@@ -164,6 +164,8 @@ namespace duckdb
         file_handle->Read(reinterpret_cast<char *>(&extra_len), sizeof(extra_len));
         datamodel_ofs += ZIP_LOCAL_FILE_HEADER + filename_len + extra_len;
 
+        // auto datamodel_ofs = 0;
+        // auto datamodel_size = file_handle->GetFileSize();
         file_handle->Seek(datamodel_ofs);
         XPress9Wrapper xpress9_wrapper;
         if (!xpress9_wrapper.Initialize())
