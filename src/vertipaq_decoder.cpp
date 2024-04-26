@@ -137,42 +137,8 @@ namespace duckdb
     {
         this->error_code = error_code;
         auto &fs = FileSystem::GetFileSystem(context);
-        auto file_handle = fs.OpenFile(path, FILE_READ);
-        if (!file_handle)
-        {
-            throw std::runtime_error("Could not open zip file");
-        }
-
-        if (!file_handle->CanSeek())
-        {
-            throw std::runtime_error("File is non seek-able");
-        }
-
-        std::cout << "Opened file: " << path << std::endl;
-        auto &zip_is = (std::istringstream &)file_handle;
-        // next line fails with segmentation fault
-        kaitai::kstream ks(&zip_is);
-
-        std::cout << "Opened kstream" << std::endl;
-        unzip_datamodel_t zip_data(&ks);
-
-        uint32_t datamodel_size = 0;
-        uint32_t datamodel_ofs = 0;
-        uint64_t bytes_read = 0;
-
-        // std::vector<unzip_datamodel_t::central_dir_entry_t*>* central_dir = zip_data.central_dir();
-
-        for (auto &entry : *zip_data.central_dir()) {
-            if (entry->file_name() == "DataModel") {
-                auto local_header = entry->local_header();
-                datamodel_size = local_header->len_body_compressed();
-                datamodel_ofs  = entry->ofs_local_header()+ZIP_LOCAL_FILE_HEADER_FIXED + local_header->len_file_name() + local_header->len_extra();
-                std::cout << "DataModel found at offset: " << datamodel_ofs << " with size: " << datamodel_size << std::endl;
-                break;
-            }
-        }
-
-        file_handle->Seek(datamodel_ofs);
+        auto archive = ZipArchiveFileHandle::Open(fs, path);
+        auto datamodel = archive->Extract("DataModel");
         XPress9Wrapper xpress9_wrapper;
         if (!xpress9_wrapper.Initialize())
         {
@@ -181,26 +147,22 @@ namespace duckdb
 
         // Seek to the start of the DataModel compressed data
         std::vector<uint8_t> signature(ABF_XPRESS9_SIGNATURE);
-        file_handle->Read(reinterpret_cast<char *>(signature.data()), ABF_XPRESS9_SIGNATURE);
+        datamodel->Read(reinterpret_cast<char *>(signature.data()), ABF_XPRESS9_SIGNATURE);
 
-        bytes_read += ABF_XPRESS9_SIGNATURE;
-
-        while (bytes_read < datamodel_size)
+        while (!datamodel->IsDone())
         {
             uint32_t uncompressed_size;
             uint32_t compressed_size;
             // Read the compressed and uncompressed sizes before the offset
-            file_handle->Read(reinterpret_cast<char *>(&uncompressed_size), sizeof(uint32_t));
-            file_handle->Read(reinterpret_cast<char *>(&compressed_size), sizeof(uint32_t));
-            bytes_read += sizeof(uint32_t) + sizeof(uint32_t);
-
+            datamodel->Read(reinterpret_cast<char *>(&uncompressed_size), sizeof(uint32_t));
+            datamodel->Read(reinterpret_cast<char *>(&compressed_size), sizeof(uint32_t));
+            
             // Allocate buffers for compressed and decompressed data
             std::vector<uint8_t> decompressed_buffer(uncompressed_size);
             std::vector<uint8_t> compressed_buffer(compressed_size);
 
-            file_handle->Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
-            bytes_read += compressed_size;
-
+            datamodel->Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
+            
             // Decompress the entire data
             uint32_t decompressed_size = xpress9_wrapper.Decompress(compressed_buffer.data(), compressed_size, decompressed_buffer.data(), decompressed_buffer.size());
             // Verify that the total decompressed size matches the expected size

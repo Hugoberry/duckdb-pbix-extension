@@ -64,6 +64,7 @@ set(EXTENSION_SOURCES
     src/column_data_idfmeta.cpp
     src/column_data_idf.cpp
     src/column_data_dictionary.cpp
+    src/zip_archive.cpp
     ${KAITAI_SOURCES}
     ${SQLITE_SOURCES}
     ${TINYXML2_SOURCES}

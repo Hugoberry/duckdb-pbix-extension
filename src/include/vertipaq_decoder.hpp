@@ -8,7 +8,7 @@
 #include <sstream>
 #include "vertipaq_meta.hpp"
 #include "Xpress9Wrapper.h"
-#include "unzip_datamodel.h"
+#include "zip_archive.hpp"
 #include "kaitaistream.h"
 #include "column_data_idf.h"
 #include "column_data_idfmeta.h"
