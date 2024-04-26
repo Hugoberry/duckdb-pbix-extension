@@ -143,29 +143,35 @@ namespace duckdb
             throw std::runtime_error("Could not open zip file");
         }
 
-        ZipUtils::EndOfCentralDirectoryRecord eocd;
-
-        // Find the end of central directory record
-        if (!ZipUtils::findEndOfCentralDirectory(*file_handle, eocd))
+        if (!file_handle->CanSeek())
         {
-            throw std::runtime_error("End of central directory not found.");
+            throw std::runtime_error("File is non seek-able");
         }
-        // Now, try to find a specific file in the ZIP, for example "DataModel"
-        auto [datamodel_ofs, datamodel_size] = ZipUtils::findDataModel(*file_handle);
 
+        std::cout << "Opened file: " << path << std::endl;
+        auto &zip_is = (std::istringstream &)file_handle;
+        // next line fails with segmentation fault
+        kaitai::kstream ks(&zip_is);
+
+        std::cout << "Opened kstream" << std::endl;
+        unzip_datamodel_t zip_data(&ks);
+
+        uint32_t datamodel_size = 0;
+        uint32_t datamodel_ofs = 0;
         uint64_t bytes_read = 0;
-        uint16_t zip_pointer = 0;
 
-        // Read compressed DataModel header to adjust offset
-        file_handle->Seek(datamodel_ofs + ZIP_LOCAL_FILE_HEADER_FIXED);
-        uint16_t filename_len = 0;
-        uint16_t extra_len = 0;
-        file_handle->Read(reinterpret_cast<char *>(&filename_len), sizeof(filename_len));
-        file_handle->Read(reinterpret_cast<char *>(&extra_len), sizeof(extra_len));
-        datamodel_ofs += ZIP_LOCAL_FILE_HEADER + filename_len + extra_len;
+        // std::vector<unzip_datamodel_t::central_dir_entry_t*>* central_dir = zip_data.central_dir();
 
-        // auto datamodel_ofs = 0;
-        // auto datamodel_size = file_handle->GetFileSize();
+        for (auto &entry : *zip_data.central_dir()) {
+            if (entry->file_name() == "DataModel") {
+                auto local_header = entry->local_header();
+                datamodel_size = local_header->len_body_compressed();
+                datamodel_ofs  = entry->ofs_local_header()+ZIP_LOCAL_FILE_HEADER_FIXED + local_header->len_file_name() + local_header->len_extra();
+                std::cout << "DataModel found at offset: " << datamodel_ofs << " with size: " << datamodel_size << std::endl;
+                break;
+            }
+        }
+
         file_handle->Seek(datamodel_ofs);
         XPress9Wrapper xpress9_wrapper;
         if (!xpress9_wrapper.Initialize())

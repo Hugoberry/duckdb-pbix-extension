@@ -49,6 +49,7 @@ SET(ABF_SOURCES
     src/abf/file_list.cpp
     src/abf/languages.cpp
     src/abf/log_backup_file.cpp
+    src/abf/unzip_datamodel.cpp
     src/abf/virtual_directory.cpp
     src/abf/zip_utils.cpp)
 
