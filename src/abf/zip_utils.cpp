@@ -49,7 +49,9 @@ std::pair<uint32_t, uint32_t> ZipUtils::findDataModel(duckdb::FileHandle &file_h
 
         if (std::string(filename.begin(), filename.end()) == "DataModel")
         {
-            return {cdHeader.localHeaderOffset, cdHeader.compressedSize};
+            uint32_t localHeaderOffset = cdHeader.localHeaderOffset; // Make a copy because packed struct
+            uint32_t compressedSize = cdHeader.compressedSize;       // Make a copy because packed struct
+            return {localHeaderOffset, compressedSize};
         }
 
         // Move to the next entry, skipping over the extra fields and comments

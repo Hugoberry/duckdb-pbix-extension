@@ -9,9 +9,9 @@
 class ZipUtils
 {
 public:
-#pragma pack(push, 1)
+// #pragma pack(push, 1)
     // Structure to store the end of central directory record.
-    struct EndOfCentralDirectoryRecord
+    struct __attribute__((packed))  EndOfCentralDirectoryRecord
     {
         uint32_t signature;
         uint16_t diskNumber;
@@ -22,11 +22,11 @@ public:
         uint32_t centralDirectoryOffset;
         uint16_t commentLength;
     };
-#pragma pack(pop)
+// #pragma pack(pop)
 
-#pragma pack(push, 1)
+// #pragma pack(push, 1)
     // Structure to store the central directory file header.
-    struct CentralDirectoryFileHeader
+    struct __attribute__((packed)) CentralDirectoryFileHeader
     {
         uint32_t signature;
         uint16_t versionMadeBy;
@@ -46,7 +46,7 @@ public:
         uint32_t externalFileAttributes;
         uint32_t localHeaderOffset;
     };
-#pragma pack(pop)
+// #pragma pack(pop)
     static bool findEndOfCentralDirectory(duckdb::FileHandle &file_handle, ZipUtils::EndOfCentralDirectoryRecord &eocd);
     static std::pair<uint32_t, uint32_t> findDataModel(duckdb::FileHandle &file_handle);
 };
