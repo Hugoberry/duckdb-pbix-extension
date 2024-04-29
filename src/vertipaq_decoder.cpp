@@ -4,7 +4,7 @@ namespace duckdb
 {
     std::vector<uint64_t> VertipaqDecoder::readBitPacked(const std::vector<uint64_t> &sub_segment, uint64_t bit_width, uint64_t min_data_id)
     {
-        uint64_t mask = (1 << bit_width) - 1;
+        uint64_t mask = (1ULL << bit_width) - 1;
         std::vector<uint64_t> res;
         for (auto u8le : sub_segment)
         {
