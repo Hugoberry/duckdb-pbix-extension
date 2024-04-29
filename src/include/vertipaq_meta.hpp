@@ -19,6 +19,7 @@ struct VertipaqDetails
 	int64_t DataType;
 	int64_t BaseId;
 	double Magnitude;
+	int64_t IsNullable;
 };
 
 struct IdfMetadata

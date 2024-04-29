@@ -141,7 +141,7 @@ namespace duckdb
 											   : '"' + SQLiteUtils::SanitizeIdentifier(bind_data.names[column_id]) + '"'; });
 
 		auto sql =
-			StringUtil::Format("SELECT c.ExplicitName,cs.StoragePosition,sfd.FileName,sfi.FileName,c.ExplicitDataType,ds.BaseId, ds.Magnitude FROM COLUMN c JOIN [Table] t ON c.TableId = t.ID JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID LEFT JOIN DictionaryStorage ds ON ds.ID = cs.DictionaryStorageID LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID WHERE c.Type = 1 AND t.Name='%s'", SQLiteUtils::SanitizeIdentifier(bind_data.table_name));
+			StringUtil::Format("SELECT c.ExplicitName,cs.StoragePosition,sfd.FileName,sfi.FileName,c.ExplicitDataType,ds.BaseId, ds.Magnitude, ds.IsNullable FROM COLUMN c JOIN [Table] t ON c.TableId = t.ID JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID LEFT JOIN DictionaryStorage ds ON ds.ID = cs.DictionaryStorageID LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID WHERE c.Type = 1 AND t.Name='%s'", SQLiteUtils::SanitizeIdentifier(bind_data.table_name));
 		if (bind_data.rows_per_group != idx_t(-1))
 		{
 			// we are scanning a subset of the rows - generate a WHERE clause based on
@@ -264,6 +264,7 @@ namespace duckdb
 					sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(4)),
 					sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(5)),
 					sqlite3_value_double(stmt.GetValue<sqlite3_value *>(6)),
+					sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(7))
 				};
 		
 
@@ -274,21 +275,31 @@ namespace duckdb
 				{
 					// Process string data
 					auto result_vec = vdecoder.processVertipaqStr(details, vertipaq_files);
-					out_idx +=std::min(int(result_vec.size()), STANDARD_VECTOR_SIZE);
+					out_idx +=std::min<int>(result_vec.size(), STANDARD_VECTOR_SIZE);
 
-					for(idx_t i = 0; i < std::min(int(result_vec.size()), STANDARD_VECTOR_SIZE); i++)
+					for(idx_t i = 0; i < std::min<int>(result_vec.size(), STANDARD_VECTOR_SIZE); i++)
 					{
-						output.SetValue(col_idx,i,result_vec[i]);
+						if(details.DataType== 10) {
+							output.SetValue(col_idx,i,duckdb::Value(std::stoi(result_vec[i])/10000.0000));
+						} else {
+							output.SetValue(col_idx,i,result_vec[i]);
+						
+						}
 					}
 				}
 				else
 				{
 					// Process integer data
 					auto result_vec = vdecoder.processVertipaqInt(details, vertipaq_files);
-					out_idx += std::min(int(result_vec.size()), STANDARD_VECTOR_SIZE);
-					for(idx_t i = 0; i < std::min(int(result_vec.size()), STANDARD_VECTOR_SIZE); i++)
+					out_idx += std::min<int>(result_vec.size(), STANDARD_VECTOR_SIZE);
+					for(idx_t i = 0; i < std::min<int>(result_vec.size(), STANDARD_VECTOR_SIZE); i++)
 					{
-						output.SetValue(col_idx,i,duckdb::Value::BIGINT(result_vec[i]));
+						if(details.DataType== 10) {
+							// std::cout << result_vec[i] <<" " <<std::endl;
+							output.SetValue(col_idx,i,duckdb::Value(result_vec[i]/10000.0000));
+						} else {
+							output.SetValue(col_idx,i,duckdb::Value::BIGINT(result_vec[i]));
+						}
 					}
 				}
 			}

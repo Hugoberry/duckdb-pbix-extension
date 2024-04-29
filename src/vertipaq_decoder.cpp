@@ -225,7 +225,9 @@ namespace duckdb
         auto correction = error_code ? 4 : 0;
         std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size - correction);
 
-        auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
+        int null_adjustment = details.IsNullable && details.DataType==2 ? 1 : 0;
+
+        auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
 
         std::vector<std::string> output;
         for (int i = 0; i < vector.size(); i++)
