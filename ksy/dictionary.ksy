@@ -58,13 +58,18 @@ types:
       - id: page_compressed
         type: u1
       - id: string_store_begin_mark
-        type: u4
+        contents: [0xDD, 0xCC, 0xBB, 0xAA]
       - id: string_store
-        type: string_store_section
+        type:
+          switch-on: page_compressed
+          cases:
+            0: uncompressed_strings
+            1: compressed_strings
       - id: string_store_end_mark
-        type: u4
+        contents: [0xCD,0xAB,0xCD,0xAB]
         
-  string_store_section:
+
+  uncompressed_strings:
     seq:
       - id: remaining_store_available
         type: u8
@@ -76,6 +81,25 @@ types:
         type: str
         size: allocation_size
         encoding: UTF-16LE
+
+  compressed_strings:
+    seq:
+      - id: store_total_bits
+        type: u4
+      - id: character_set_type_identifier
+        type: u4
+      - id: allocation_size
+        type: u8
+      - id: character_set_used
+        type: u1
+      - id: ui_decode_bits
+        type: u4
+      - id: encode_array
+        size: 128
+      - id: ui64_buffer_size
+        type: u8
+      - id: compressed_string_buffer
+        size: allocation_size
 
   dictionary_record_handles_vector:
     seq:
