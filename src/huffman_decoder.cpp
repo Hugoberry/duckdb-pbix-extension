@@ -29,48 +29,14 @@ std::shared_ptr<HuffmanNode> sortSymbols(const std::vector<uint8_t> &bitLengthTa
     return head;
 }
 
-bool verifyFullBinaryTree(const std::vector<size_t> &bitLengthCount)
-{
+bool verifyFullBinaryTree(const std::vector<size_t>& bitLengthCount) {
     size_t n = 0;
-    for (int i = MAX_CODEWORD_LENGTH - 1; i >= 0; i--)
-    {
+    for (int i = MAX_CODEWORD_LENGTH - 1; i > 0; --i) {
         n += bitLengthCount[i];
-        printf("n: %d i: %d\n", n,i);
-        if ((n & 1) != 0)
-            return false;
-        n >>= 1;
+        if (n % 2 != 0) return false;
+        n /= 2;
     }
-    printf("n: %d\n", n);
     return n == 1;
-
-/*
-    size_t i;
-    size_t n;
-
-    n = 0;
-    i = MAX_CODEWORD_LENGTH - 1;
-    do
-    {
-        n += bitLengthCount[i];
-        if ((n & 1) != 0) // n is odd
-        {
-            return false;
-        }
-        n >>= 1;
-        --i;
-    }
-    while (i != 0);
-
-    // n != 1 checks for -> there is at least one symbol with non-zero codeword length
-    // uBitLengthCount[0] -> number of symbols with codeword length 0 = 0.
-    if (n != 1 || bitLengthCount[0] != 0)
-    {
-        printf("n: %d\n", n);
-        return false;
-    }
-
-    return true;
-*/
 }
 
 // Utility function to reverse bits (e.g., 3-bit 101 -> 101 in reverse)
@@ -91,20 +57,25 @@ size_t fillDecodeTable(const std::shared_ptr<HuffmanNode> &sortedSymbols, std::v
     size_t rootLevel = 0;
     std::shared_ptr<HuffmanNode> currentNode = sortedSymbols;
 
-    // For each node in the sorted symbol list
-    while (currentNode)
-    {
+    // Loop through sorted symbols and fill the decode table
+    while (currentNode) {
         size_t symbolBits = currentNode->bits;
-        size_t nodeLevel = (symbolBits <= rootBits) ? rootBits : symbolBits - tailBits;
 
+        // Determine the level of the node in the tree
+        size_t nodeLevel = symbolBits;  // Start at the symbol's bit length
+        while (nodeLevel > rootBits && (nodeLevel - tailBits) >= rootLevel) {
+            // Move up the tree level by level until we reach the appropriate level
+            // for table creation (either at rootBits or just below it).
+            nodeLevel -= tailBits; 
+        }
         size_t tableSize = 1 << (symbolBits - rootLevel);
-        for (size_t i = 0; i < tableSize; ++i)
-        {
+
+        for (size_t i = 0; i < tableSize; ++i) {
             uint16_t index = reverseBits(i, symbolBits - rootLevel);
-            decodeTable[tableOffset + index] = currentNode->symbol << 4 | (symbolBits - rootLevel);
+            uint16_t value = (currentNode->symbol << 4) | (symbolBits - rootLevel);
+            decodeTable[tableOffset + index] = value;
         }
 
-        // Advance the pointer to the next node in the sorted list
         currentNode = currentNode->next;
         tableOffset += tableSize;
         rootLevel = nodeLevel;
@@ -130,4 +101,31 @@ void createDecodeTables(const std::vector<uint8_t> &bitLengthTable, HuffmanTable
     }
 
     fillDecodeTable(sortedSymbols, decodeTable, rootBits, tailBits);
+}
+
+
+// Helper function to read a specific number of bits from the bit buffer
+uint16_t readBits(const std::string& bitBuffer, size_t& offset, size_t bitCount) {
+    uint16_t result = 0;
+    for (size_t i = 0; i < bitCount; ++i) {
+        result = (result << 1) | ((bitBuffer[offset / 8] >> (7 - offset % 8)) & 1);
+        ++offset;
+    }
+    return result;
+}
+
+// Function to decode a Huffman-encoded symbol from the bit buffer
+uint16_t huffmanDecodeSymbol(const std::string& bitBuffer, size_t& offset, size_t bitBufferSize, const std::vector<uint16_t>& decodeTable, size_t rootLookupBits, size_t tailLookupBits) {
+    uint16_t index = readBits(bitBuffer, offset, rootLookupBits);
+    uint16_t symbolValue = decodeTable[index];
+
+    while (symbolValue & (1 << 15)) {
+        offset += (symbolValue & 0x0F);
+        size_t nextTableOffset = (symbolValue >> 4) & ~(1 << 15);
+        index = readBits(bitBuffer, offset, tailLookupBits);
+        symbolValue = decodeTable[nextTableOffset + index];
+    }
+
+    offset += (symbolValue & 0x0F);
+    return symbolValue >> 4;
 }

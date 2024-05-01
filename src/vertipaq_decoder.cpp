@@ -38,14 +38,32 @@ namespace duckdb
             {
                 auto compressed_store = static_cast<column_data_dictionary_t::compressed_strings_t *>(page->string_store());
                 auto encode_array = compressed_store->encode_array();
+                auto store_total_bits = compressed_store->store_total_bits();
 
                 std::vector<uint8_t> target_vector(encode_array->begin(), encode_array->end());
                 auto ui_decode_bits =  compressed_store->ui_decode_bits();
                 auto compressed_string_buffer = compressed_store->compressed_string_buffer();
                 
                 // Huffman decode table
-                HuffmanTable decodeTable;
+                HuffmanTable decodeTable(256);
                 createDecodeTables(target_vector, decodeTable, ui_decode_bits, ui_decode_bits);
+                size_t offset = 0; // Offset in bits
+                std::vector<uint16_t> decodedSymbols;
+                
+                // Assuming you know the expected number of symbols
+                while (offset < store_total_bits) {
+                    auto decodedSymbol = huffmanDecodeSymbol(compressed_string_buffer, offset, store_total_bits, decodeTable, ui_decode_bits, ui_decode_bits); // tailBits of 4
+                    std::cout << "Decoded Symbol: " << decodedSymbol << std::endl;
+                    decodedSymbols.push_back(decodedSymbol);
+                }
+
+                // Convert decoded symbols to a string (assuming it's ASCII or similar)
+                std::string decodedString;
+                for (const auto& symbol : decodedSymbols) {
+                    decodedString += static_cast<char>(symbol);
+                }
+
+                std::cout << "Decoded String: " << decodedString << std::endl;
 
                 // Assuming you have a status structure for error handling
                 // XPRESS9_STATUS status = {0}; // Make sure the status is initialized correctly
@@ -67,11 +85,7 @@ namespace duckdb
                 // Now you can decode using decodeTable and CompressedStringBuffer
 
                 //cout the decoded table
-                for (int i = 0; i < 256; i++)
-                {
-                    std::cout << "Decode table: " << i << " " << decodeTable[i] << std::endl;
-                }
-                
+                              
                 throw std::runtime_error("Compressed string dictionary not supported");
             } else {
                 auto uncompressed_store = static_cast<column_data_dictionary_t::uncompressed_strings_t *>(page->string_store());

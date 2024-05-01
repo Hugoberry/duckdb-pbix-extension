@@ -22,3 +22,5 @@ std::shared_ptr<HuffmanNode> sortSymbols(const std::vector<uint8_t>& bitLengthTa
 bool verifyFullBinaryTree(const std::vector<size_t>& bitLengthCount);
 size_t fillDecodeTable(const std::shared_ptr<HuffmanNode>& sortedSymbols, HuffmanTable& decodeTable, size_t rootBits, size_t tailBits);
 void createDecodeTables(const std::vector<uint8_t>& bitLengthTable, HuffmanTable& decodeTable, size_t rootBits, size_t tailBits);
+uint16_t huffmanDecodeSymbol(const std::string& bitBuffer, size_t& offset, size_t bitBufferSize, const std::vector<uint16_t>& decodeTable, size_t rootLookupBits, size_t tailLookupBits);
+uint16_t readBits(const std::string& bitBuffer, size_t& offset, size_t bitCount);
