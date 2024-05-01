@@ -1,5 +1,6 @@
 #include "vertipaq_decoder.hpp"
 #include <iostream>
+#include "huffman_decoder.h"
 namespace duckdb
 {
     std::vector<uint64_t> VertipaqDecoder::readBitPacked(const std::vector<uint64_t> &sub_segment, uint64_t bit_width, uint64_t min_data_id)
@@ -33,17 +34,58 @@ namespace duckdb
             // Assuming there's only one dictionary page for simplification
             auto stringData = static_cast<column_data_dictionary_t::string_data_t *>(dictionary.data());
             auto page = stringData->dictionary_pages();
-            std::string uncompressed = page->string_store()->uncompressed_character_buffer();
+            if (page->page_compressed())
+            {
+                auto compressed_store = static_cast<column_data_dictionary_t::compressed_strings_t *>(page->string_store());
+                auto encode_array = compressed_store->encode_array();
 
-            // Extracting strings and filling the hashtable
-            std::istringstream ss(uncompressed);
-            std::string token;
-            int index = min_data_id;
-            while (std::getline(ss, token, '\0'))
-            { // assuming null-terminated strings in buffer
-                hashtable[index++] = token;
+                std::vector<uint8_t> target_vector(encode_array->begin(), encode_array->end());
+                auto ui_decode_bits =  compressed_store->ui_decode_bits();
+                auto compressed_string_buffer = compressed_store->compressed_string_buffer();
+                
+                // Huffman decode table
+                HuffmanTable decodeTable;
+                createDecodeTables(target_vector, decodeTable, ui_decode_bits, ui_decode_bits);
+
+                // Assuming you have a status structure for error handling
+                // XPRESS9_STATUS status = {0}; // Make sure the status is initialized correctly
+                // HUFFMAN_DECODE_TABLE_ENTRY decodeTable[65536]; // Example size, adjust as needed
+                // HUFFMAN_DECODE_NODE scratch[256 * 2]; // Temporary scratch space for node storage
+
+                // // Fill decoding tables
+                // uint32_t decodeTableSize = sizeof(decodeTable) / sizeof(decodeTable[0]);
+                // HUFFMAN_DECODE_TABLE_ENTRY* tableEntriesUsedPtr = HuffmanCreateDecodeTables(
+                //     &status,
+                //     encode_array,
+                //     256, // Alphabet size
+                //     decodeTable,
+                //     decodeTableSize,
+                //     ui_decode_bits, // Root bits determined by your uiDecodeBits
+                //     ui_decode_bits, // Tail bits could be the same or different
+                //     scratch
+                // );
+                // Now you can decode using decodeTable and CompressedStringBuffer
+
+                //cout the decoded table
+                for (int i = 0; i < 256; i++)
+                {
+                    std::cout << "Decode table: " << i << " " << decodeTable[i] << std::endl;
+                }
+                
+                throw std::runtime_error("Compressed string dictionary not supported");
+            } else {
+                auto uncompressed_store = static_cast<column_data_dictionary_t::uncompressed_strings_t *>(page->string_store());
+                std::string uncompressed = uncompressed_store->uncompressed_character_buffer();
+                // Extracting strings and filling the hashtable
+                std::istringstream ss(uncompressed);
+                std::string token;
+                int index = min_data_id;
+                while (std::getline(ss, token, '\0'))
+                { // assuming null-terminated strings in buffer
+                    hashtable[index++] = token;
+                }
+                return hashtable;
             }
-            return hashtable;
         }
         else if (dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_LONG ||
                  dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_REAL)
@@ -261,4 +303,39 @@ namespace duckdb
 
         return output;
     }
+/*
+    void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::Vector &output) {
+        // Common processing
+        std::string idf_metadata = details.IDF + "meta";
+        auto &meta_file = vfiles[idf_metadata];
+        std::string idf_meta_stream(all_decompressed_data.begin() + meta_file.m_cbOffsetHeader, 
+                                    all_decompressed_data.begin() + meta_file.m_cbOffsetHeader + meta_file.Size);
+        IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
+
+        // Read IDF with error correction
+        int correction = error_code ? 4 : 0;
+        auto &idf_file = vfiles[details.IDF];
+        std::string idf_stream(all_decompressed_data.begin() + idf_file.m_cbOffsetHeader, 
+                            all_decompressed_data.begin() + idf_file.m_cbOffsetHeader + idf_file.Size - correction);
+
+        // Decode data
+        auto decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
+
+        // Type-specific processing directly into DuckDB vector
+        // if (details.DataType == STRING_TYPE) {
+        if (details.DataType == 2) {
+            std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader,
+                                        all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
+            auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
+            // duckdb::FlatVector::SetData(output, (duckdb::data_ptr_t)dictionary.data()); // Example setting vector data
+        } else {
+            // Assuming integer processing
+            std::vector<int64_t> processed_values;
+            for (auto idx : decoded_indices) {
+                processed_values.push_back((idx + details.BaseId) / details.Magnitude);
+            }
+            duckdb::FlatVector::SetData(output, (duckdb::data_ptr_t)processed_values.data());
+        }
+    }
+*/
 } // namespace duckdb

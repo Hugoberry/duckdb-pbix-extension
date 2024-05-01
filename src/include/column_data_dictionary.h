@@ -15,11 +15,12 @@ class column_data_dictionary_t : public kaitai::kstruct {
 
 public:
     class string_data_t;
-    class string_store_section_t;
     class hash_info_t;
     class vector_of_vectors_t;
+    class compressed_strings_t;
     class page_layout_t;
     class dictionary_page_t;
+    class uncompressed_strings_t;
     class number_data_t;
     class dictionary_record_handles_vector_t;
 
@@ -65,36 +66,6 @@ public:
         dictionary_record_handles_vector_t* dictionary_record_handles_vector_info() const { return m_dictionary_record_handles_vector_info; }
         column_data_dictionary_t* _root() const { return m__root; }
         column_data_dictionary_t* _parent() const { return m__parent; }
-    };
-
-    class string_store_section_t : public kaitai::kstruct {
-
-    public:
-
-        string_store_section_t(kaitai::kstream* p__io, column_data_dictionary_t::dictionary_page_t* p__parent = 0, column_data_dictionary_t* p__root = 0);
-
-    private:
-        void _read();
-        void _clean_up();
-
-    public:
-        ~string_store_section_t();
-
-    private:
-        uint64_t m_remaining_store_available;
-        uint64_t m_buffer_used_characters;
-        uint64_t m_allocation_size;
-        std::string m_uncompressed_character_buffer;
-        column_data_dictionary_t* m__root;
-        column_data_dictionary_t::dictionary_page_t* m__parent;
-
-    public:
-        uint64_t remaining_store_available() const { return m_remaining_store_available; }
-        uint64_t buffer_used_characters() const { return m_buffer_used_characters; }
-        uint64_t allocation_size() const { return m_allocation_size; }
-        std::string uncompressed_character_buffer() const { return m_uncompressed_character_buffer; }
-        column_data_dictionary_t* _root() const { return m__root; }
-        column_data_dictionary_t::dictionary_page_t* _parent() const { return m__parent; }
     };
 
     class hash_info_t : public kaitai::kstruct {
@@ -177,6 +148,44 @@ public:
         column_data_dictionary_t::number_data_t* _parent() const { return m__parent; }
     };
 
+    class compressed_strings_t : public kaitai::kstruct {
+
+    public:
+
+        compressed_strings_t(kaitai::kstream* p__io, column_data_dictionary_t::dictionary_page_t* p__parent = 0, column_data_dictionary_t* p__root = 0);
+
+    private:
+        void _read();
+        void _clean_up();
+
+    public:
+        ~compressed_strings_t();
+
+    private:
+        uint32_t m_store_total_bits;
+        uint32_t m_character_set_type_identifier;
+        uint64_t m_allocation_size;
+        uint8_t m_character_set_used;
+        uint32_t m_ui_decode_bits;
+        std::vector<uint64_t>* m_encode_array;
+        uint64_t m_ui64_buffer_size;
+        std::string m_compressed_string_buffer;
+        column_data_dictionary_t* m__root;
+        column_data_dictionary_t::dictionary_page_t* m__parent;
+
+    public:
+        uint32_t store_total_bits() const { return m_store_total_bits; }
+        uint32_t character_set_type_identifier() const { return m_character_set_type_identifier; }
+        uint64_t allocation_size() const { return m_allocation_size; }
+        uint8_t character_set_used() const { return m_character_set_used; }
+        uint32_t ui_decode_bits() const { return m_ui_decode_bits; }
+        std::vector<uint64_t>* encode_array() const { return m_encode_array; }
+        uint64_t ui64_buffer_size() const { return m_ui64_buffer_size; }
+        std::string compressed_string_buffer() const { return m_compressed_string_buffer; }
+        column_data_dictionary_t* _root() const { return m__root; }
+        column_data_dictionary_t::dictionary_page_t* _parent() const { return m__parent; }
+    };
+
     class page_layout_t : public kaitai::kstruct {
 
     public:
@@ -226,9 +235,15 @@ public:
         uint64_t m_page_start_index;
         uint64_t m_page_string_count;
         uint8_t m_page_compressed;
-        uint32_t m_string_store_begin_mark;
-        string_store_section_t* m_string_store;
-        uint32_t m_string_store_end_mark;
+        std::string m_string_store_begin_mark;
+        kaitai::kstruct* m_string_store;
+        bool n_string_store;
+
+    public:
+        bool _is_null_string_store() { string_store(); return n_string_store; };
+
+    private:
+        std::string m_string_store_end_mark;
         column_data_dictionary_t* m__root;
         column_data_dictionary_t::string_data_t* m__parent;
 
@@ -238,11 +253,41 @@ public:
         uint64_t page_start_index() const { return m_page_start_index; }
         uint64_t page_string_count() const { return m_page_string_count; }
         uint8_t page_compressed() const { return m_page_compressed; }
-        uint32_t string_store_begin_mark() const { return m_string_store_begin_mark; }
-        string_store_section_t* string_store() const { return m_string_store; }
-        uint32_t string_store_end_mark() const { return m_string_store_end_mark; }
+        std::string string_store_begin_mark() const { return m_string_store_begin_mark; }
+        kaitai::kstruct* string_store() const { return m_string_store; }
+        std::string string_store_end_mark() const { return m_string_store_end_mark; }
         column_data_dictionary_t* _root() const { return m__root; }
         column_data_dictionary_t::string_data_t* _parent() const { return m__parent; }
+    };
+
+    class uncompressed_strings_t : public kaitai::kstruct {
+
+    public:
+
+        uncompressed_strings_t(kaitai::kstream* p__io, column_data_dictionary_t::dictionary_page_t* p__parent = 0, column_data_dictionary_t* p__root = 0);
+
+    private:
+        void _read();
+        void _clean_up();
+
+    public:
+        ~uncompressed_strings_t();
+
+    private:
+        uint64_t m_remaining_store_available;
+        uint64_t m_buffer_used_characters;
+        uint64_t m_allocation_size;
+        std::string m_uncompressed_character_buffer;
+        column_data_dictionary_t* m__root;
+        column_data_dictionary_t::dictionary_page_t* m__parent;
+
+    public:
+        uint64_t remaining_store_available() const { return m_remaining_store_available; }
+        uint64_t buffer_used_characters() const { return m_buffer_used_characters; }
+        uint64_t allocation_size() const { return m_allocation_size; }
+        std::string uncompressed_character_buffer() const { return m_uncompressed_character_buffer; }
+        column_data_dictionary_t* _root() const { return m__root; }
+        column_data_dictionary_t::dictionary_page_t* _parent() const { return m__parent; }
     };
 
     class number_data_t : public kaitai::kstruct {

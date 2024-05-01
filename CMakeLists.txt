@@ -63,6 +63,7 @@ set(EXTENSION_SOURCES
     src/column_data_idfmeta.cpp
     src/column_data_idf.cpp
     src/column_data_dictionary.cpp
+    src/huffman_decoder.cpp
     ${KAITAI_SOURCES}
     ${SQLITE_SOURCES}
     ${TINYXML2_SOURCES}
