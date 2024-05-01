@@ -51,34 +51,40 @@ uint16_t reverseBits(uint16_t num, size_t bitCount)
     return reversed;
 }
 
-size_t fillDecodeTable(const std::shared_ptr<HuffmanNode> &sortedSymbols, std::vector<uint16_t> &decodeTable, size_t rootBits, size_t tailBits)
-{
+size_t fillDecodeTable(const std::shared_ptr<HuffmanNode> &sortedSymbols, 
+                      std::vector<uint16_t> &decodeTable, 
+                      size_t rootBits, 
+                      size_t tailBits) {
+
     size_t tableOffset = 0;
-    size_t rootLevel = 0;
+    size_t currentLevel = 0; // Track the current level in the tree
+
     std::shared_ptr<HuffmanNode> currentNode = sortedSymbols;
 
-    // Loop through sorted symbols and fill the decode table
     while (currentNode) {
         size_t symbolBits = currentNode->bits;
 
-        // Determine the level of the node in the tree
-        size_t nodeLevel = symbolBits;  // Start at the symbol's bit length
-        while (nodeLevel > rootBits && (nodeLevel - tailBits) >= rootLevel) {
-            // Move up the tree level by level until we reach the appropriate level
-            // for table creation (either at rootBits or just below it).
-            nodeLevel -= tailBits; 
+        // Determine the level of the node more accurately
+        while (currentLevel < symbolBits && currentLevel < rootBits) {
+            currentLevel++; 
         }
-        size_t tableSize = 1 << (symbolBits - rootLevel);
+
+        size_t tableSize = 1 << (symbolBits - currentLevel);
 
         for (size_t i = 0; i < tableSize; ++i) {
-            uint16_t index = reverseBits(i, symbolBits - rootLevel);
-            uint16_t value = (currentNode->symbol << 4) | (symbolBits - rootLevel);
+            uint16_t index = reverseBits(i, symbolBits - currentLevel);
+            uint16_t value = (currentNode->symbol << 4) | (symbolBits - currentLevel);
             decodeTable[tableOffset + index] = value;
         }
 
         currentNode = currentNode->next;
         tableOffset += tableSize;
-        rootLevel = nodeLevel;
+
+        // Adjust currentLevel if needed after processing the node
+        while (currentLevel > 0 && 
+               (currentNode == nullptr || currentNode->bits < currentLevel)) {
+            currentLevel--;
+        }
     }
 
     return tableOffset;
