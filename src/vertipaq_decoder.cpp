@@ -39,10 +39,51 @@ namespace duckdb
                 auto compressed_store = static_cast<column_data_dictionary_t::compressed_strings_t *>(page->string_store());
                 auto encode_array = compressed_store->encode_array();
                 auto store_total_bits = compressed_store->store_total_bits();
+                auto character_set_used = compressed_store->character_set_used();
+                auto record_handles = stringData->dictionary_record_handles_vector_info()->vector_of_record_handle_structures();
 
                 std::vector<uint8_t> target_vector(encode_array->begin(), encode_array->end());
                 auto ui_decode_bits =  compressed_store->ui_decode_bits();
                 auto compressed_string_buffer = compressed_store->compressed_string_buffer();
+
+                // Reconstruct the Huffman tree
+                std::vector<uint8_t> huffmanTree = ReconstructHuffmanTree(target_vector, ui_decode_bits);
+
+                for(auto i : huffmanTree) {
+                    std::cout << static_cast<int>(i) << " ";
+                }
+                
+                // Decode the bit stream
+                // std::string bitStream(reinterpret_cast<const char*>(compressed_string_buffer), store_total_bits);
+                
+                // Extract individual strings based on record handles
+                std::vector<std::string> decodedStrings;
+                auto& handles = *record_handles;
+                
+                for (size_t i = 0; i < handles.size(); ++i) {
+                    uint32_t startBit = static_cast<uint32_t>(handles[i]);
+                    uint32_t endBit = store_total_bits;
+
+                    // Set endBit based on the next handle, if it exists
+                    if (i + 1 < handles.size()) {
+                        endBit = static_cast<uint32_t>(handles[i + 1]);
+                    }
+
+                    // Convert bit positions to byte offsets for substr
+                    size_t startByte = startBit / 8;
+                    size_t endByte = (endBit + 7) / 8; // ceil(endBit / 8.0)
+
+                    std::string stringBitStream = compressed_string_buffer.substr(startByte, endByte - startByte);
+                    
+                    std::cout << "String Bit Stream: " << stringBitStream << std::endl;
+                    std::cout << "Start Bit: " << startBit << " End Bit: " << endBit << std::endl;
+                    // Decode the bit stream using the mock function
+                    auto decodedString = DecodeBitStream(huffmanTree, stringBitStream, character_set_used);
+
+                    // std::cout << "Decoded String: " << decodedString << std::endl;
+                    decodedStrings.push_back(decodedString);
+                }
+/*
                 
                 // Huffman decode table
                 HuffmanTable decodeTable(256);
@@ -64,7 +105,7 @@ namespace duckdb
                 }
 
                 std::cout << "Decoded String: " << decodedString << std::endl;
-
+*/
                 // Assuming you have a status structure for error handling
                 // XPRESS9_STATUS status = {0}; // Make sure the status is initialized correctly
                 // HUFFMAN_DECODE_TABLE_ENTRY decodeTable[65536]; // Example size, adjust as needed
