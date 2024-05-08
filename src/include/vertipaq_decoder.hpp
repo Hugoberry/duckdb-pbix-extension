@@ -33,5 +33,6 @@ namespace duckdb
         IdfMetadata readIdfMetadata(std::string &stream);
         std::vector<std::string> processVertipaqStr(VertipaqDetails &details, VertipaqFiles &vfiles);
         std::vector<uint64_t> processVertipaqInt(VertipaqDetails &details, VertipaqFiles &vfiles);
+        void processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::Vector &output);
     };
 } // namespace duckdb

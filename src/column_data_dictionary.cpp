@@ -1,6 +1,7 @@
 // This is a generated file! Please edit source .ksy file and use kaitai-struct-compiler to rebuild
 
 #include "column_data_dictionary.h"
+#include "kaitai/exceptions.h"
 
 column_data_dictionary_t::column_data_dictionary_t(kaitai::kstream* p__io, kaitai::kstruct* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
     m__parent = p__parent;
@@ -53,6 +54,30 @@ void column_data_dictionary_t::_clean_up() {
     }
 }
 
+column_data_dictionary_t::string_record_handle_t::string_record_handle_t(kaitai::kstream* p__io, column_data_dictionary_t::dictionary_record_handles_vector_t* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
+    m__parent = p__parent;
+    m__root = p__root;
+
+    try {
+        _read();
+    } catch(...) {
+        _clean_up();
+        throw;
+    }
+}
+
+void column_data_dictionary_t::string_record_handle_t::_read() {
+    m_bit_or_byte_offset = m__io->read_u4le();
+    m_page_id = m__io->read_u4le();
+}
+
+column_data_dictionary_t::string_record_handle_t::~string_record_handle_t() {
+    _clean_up();
+}
+
+void column_data_dictionary_t::string_record_handle_t::_clean_up() {
+}
+
 column_data_dictionary_t::string_data_t::string_data_t(kaitai::kstream* p__io, column_data_dictionary_t* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
     m__parent = p__parent;
     m__root = p__root;
@@ -70,7 +95,11 @@ column_data_dictionary_t::string_data_t::string_data_t(kaitai::kstream* p__io, c
 
 void column_data_dictionary_t::string_data_t::_read() {
     m_page_layout_information = new page_layout_t(m__io, this, m__root);
-    m_dictionary_pages = new dictionary_page_t(m__io, this, m__root);
+    m_dictionary_pages = new std::vector<dictionary_page_t*>();
+    const int l_dictionary_pages = page_layout_information()->store_page_count();
+    for (int i = 0; i < l_dictionary_pages; i++) {
+        m_dictionary_pages->push_back(new dictionary_page_t(m__io, this, m__root));
+    }
     m_dictionary_record_handles_vector_info = new dictionary_record_handles_vector_t(m__io, this, m__root);
 }
 
@@ -83,37 +112,14 @@ void column_data_dictionary_t::string_data_t::_clean_up() {
         delete m_page_layout_information; m_page_layout_information = 0;
     }
     if (m_dictionary_pages) {
+        for (std::vector<dictionary_page_t*>::iterator it = m_dictionary_pages->begin(); it != m_dictionary_pages->end(); ++it) {
+            delete *it;
+        }
         delete m_dictionary_pages; m_dictionary_pages = 0;
     }
     if (m_dictionary_record_handles_vector_info) {
         delete m_dictionary_record_handles_vector_info; m_dictionary_record_handles_vector_info = 0;
     }
-}
-
-column_data_dictionary_t::string_store_section_t::string_store_section_t(kaitai::kstream* p__io, column_data_dictionary_t::dictionary_page_t* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
-    m__parent = p__parent;
-    m__root = p__root;
-
-    try {
-        _read();
-    } catch(...) {
-        _clean_up();
-        throw;
-    }
-}
-
-void column_data_dictionary_t::string_store_section_t::_read() {
-    m_remaining_store_available = m__io->read_u8le();
-    m_buffer_used_characters = m__io->read_u8le();
-    m_allocation_size = m__io->read_u8le();
-    m_uncompressed_character_buffer = kaitai::kstream::bytes_to_str(m__io->read_bytes(allocation_size()), "UTF-16LE");
-}
-
-column_data_dictionary_t::string_store_section_t::~string_store_section_t() {
-    _clean_up();
-}
-
-void column_data_dictionary_t::string_store_section_t::_clean_up() {
 }
 
 column_data_dictionary_t::hash_info_t::hash_info_t(kaitai::kstream* p__io, column_data_dictionary_t* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
@@ -165,10 +171,10 @@ column_data_dictionary_t::vector_of_vectors_t::vector_of_vectors_t(kaitai::kstre
 }
 
 void column_data_dictionary_t::vector_of_vectors_t::_read() {
-    m_element_count = m__io->read_u8le();
+    m_num_values = m__io->read_u8le();
     m_element_size = m__io->read_u4le();
     m_values = new std::vector<double>();
-    const int l_values = element_count();
+    const int l_values = num_values();
     for (int i = 0; i < l_values; i++) {
         {
             std::string on = data_type_id();
@@ -227,6 +233,44 @@ std::string column_data_dictionary_t::vector_of_vectors_t::data_type_id() {
     return m_data_type_id;
 }
 
+column_data_dictionary_t::compressed_strings_t::compressed_strings_t(kaitai::kstream* p__io, column_data_dictionary_t::dictionary_page_t* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
+    m__parent = p__parent;
+    m__root = p__root;
+    m_encode_array = 0;
+
+    try {
+        _read();
+    } catch(...) {
+        _clean_up();
+        throw;
+    }
+}
+
+void column_data_dictionary_t::compressed_strings_t::_read() {
+    m_store_total_bits = m__io->read_u4le();
+    m_character_set_type_identifier = m__io->read_u4le();
+    m_len_compressed_string_buffer = m__io->read_u8le();
+    m_character_set_used = m__io->read_u1();
+    m_ui_decode_bits = m__io->read_u4le();
+    m_encode_array = new std::vector<uint8_t>();
+    const int l_encode_array = 128;
+    for (int i = 0; i < l_encode_array; i++) {
+        m_encode_array->push_back(m__io->read_u1());
+    }
+    m_ui64_buffer_size = m__io->read_u8le();
+    m_compressed_string_buffer = m__io->read_bytes(len_compressed_string_buffer());
+}
+
+column_data_dictionary_t::compressed_strings_t::~compressed_strings_t() {
+    _clean_up();
+}
+
+void column_data_dictionary_t::compressed_strings_t::_clean_up() {
+    if (m_encode_array) {
+        delete m_encode_array; m_encode_array = 0;
+    }
+}
+
 column_data_dictionary_t::page_layout_t::page_layout_t(kaitai::kstream* p__io, column_data_dictionary_t::string_data_t* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
     m__parent = p__parent;
     m__root = p__root;
@@ -256,7 +300,6 @@ void column_data_dictionary_t::page_layout_t::_clean_up() {
 column_data_dictionary_t::dictionary_page_t::dictionary_page_t(kaitai::kstream* p__io, column_data_dictionary_t::string_data_t* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
     m__parent = p__parent;
     m__root = p__root;
-    m_string_store = 0;
 
     try {
         _read();
@@ -272,9 +315,27 @@ void column_data_dictionary_t::dictionary_page_t::_read() {
     m_page_start_index = m__io->read_u8le();
     m_page_string_count = m__io->read_u8le();
     m_page_compressed = m__io->read_u1();
-    m_string_store_begin_mark = m__io->read_u4le();
-    m_string_store = new string_store_section_t(m__io, this, m__root);
-    m_string_store_end_mark = m__io->read_u4le();
+    m_string_store_begin_mark = m__io->read_bytes(4);
+    if (!(string_store_begin_mark() == std::string("\xDD\xCC\xBB\xAA", 4))) {
+        throw kaitai::validation_not_equal_error<std::string>(std::string("\xDD\xCC\xBB\xAA", 4), string_store_begin_mark(), _io(), std::string("/types/dictionary_page/seq/5"));
+    }
+    n_string_store = true;
+    switch (page_compressed()) {
+    case 0: {
+        n_string_store = false;
+        m_string_store = new uncompressed_strings_t(m__io, this, m__root);
+        break;
+    }
+    case 1: {
+        n_string_store = false;
+        m_string_store = new compressed_strings_t(m__io, this, m__root);
+        break;
+    }
+    }
+    m_string_store_end_mark = m__io->read_bytes(4);
+    if (!(string_store_end_mark() == std::string("\xCD\xAB\xCD\xAB", 4))) {
+        throw kaitai::validation_not_equal_error<std::string>(std::string("\xCD\xAB\xCD\xAB", 4), string_store_end_mark(), _io(), std::string("/types/dictionary_page/seq/7"));
+    }
 }
 
 column_data_dictionary_t::dictionary_page_t::~dictionary_page_t() {
@@ -282,9 +343,60 @@ column_data_dictionary_t::dictionary_page_t::~dictionary_page_t() {
 }
 
 void column_data_dictionary_t::dictionary_page_t::_clean_up() {
-    if (m_string_store) {
-        delete m_string_store; m_string_store = 0;
+    if (!n_string_store) {
+        if (m_string_store) {
+            delete m_string_store; m_string_store = 0;
+        }
     }
+}
+
+column_data_dictionary_t::other_record_handle_t::other_record_handle_t(kaitai::kstream* p__io, kaitai::kstruct* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
+    m__parent = p__parent;
+    m__root = p__root;
+
+    try {
+        _read();
+    } catch(...) {
+        _clean_up();
+        throw;
+    }
+}
+
+void column_data_dictionary_t::other_record_handle_t::_read() {
+    m_bit_or_byte_offset = m__io->read_u4le();
+}
+
+column_data_dictionary_t::other_record_handle_t::~other_record_handle_t() {
+    _clean_up();
+}
+
+void column_data_dictionary_t::other_record_handle_t::_clean_up() {
+}
+
+column_data_dictionary_t::uncompressed_strings_t::uncompressed_strings_t(kaitai::kstream* p__io, column_data_dictionary_t::dictionary_page_t* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
+    m__parent = p__parent;
+    m__root = p__root;
+
+    try {
+        _read();
+    } catch(...) {
+        _clean_up();
+        throw;
+    }
+}
+
+void column_data_dictionary_t::uncompressed_strings_t::_read() {
+    m_remaining_store_available = m__io->read_u8le();
+    m_buffer_used_characters = m__io->read_u8le();
+    m_allocation_size = m__io->read_u8le();
+    m_uncompressed_character_buffer = kaitai::kstream::bytes_to_str(m__io->read_bytes(allocation_size()), "UTF-16LE");
+}
+
+column_data_dictionary_t::uncompressed_strings_t::~uncompressed_strings_t() {
+    _clean_up();
+}
+
+void column_data_dictionary_t::uncompressed_strings_t::_clean_up() {
 }
 
 column_data_dictionary_t::number_data_t::number_data_t(kaitai::kstream* p__io, column_data_dictionary_t* p__parent, column_data_dictionary_t* p__root) : kaitai::kstruct(p__io) {
@@ -328,21 +440,15 @@ column_data_dictionary_t::dictionary_record_handles_vector_t::dictionary_record_
 }
 
 void column_data_dictionary_t::dictionary_record_handles_vector_t::_read() {
-    m_element_count = m__io->read_u8le();
-    m_element_size = m__io->read_u4le();
-    m_vector_of_record_handle_structures = new std::vector<uint64_t>();
-    const int l_vector_of_record_handle_structures = element_count();
+    m_num_vector_of_record_handle_structures = m__io->read_u8le();
+    m_element_size = m__io->read_bytes(4);
+    if (!(element_size() == std::string("\x08\x00\x00\x00", 4))) {
+        throw kaitai::validation_not_equal_error<std::string>(std::string("\x08\x00\x00\x00", 4), element_size(), _io(), std::string("/types/dictionary_record_handles_vector/seq/1"));
+    }
+    m_vector_of_record_handle_structures = new std::vector<string_record_handle_t*>();
+    const int l_vector_of_record_handle_structures = num_vector_of_record_handle_structures();
     for (int i = 0; i < l_vector_of_record_handle_structures; i++) {
-        switch (element_size()) {
-        case 4: {
-            m_vector_of_record_handle_structures->push_back(m__io->read_u4le());
-            break;
-        }
-        case 8: {
-            m_vector_of_record_handle_structures->push_back(m__io->read_u8le());
-            break;
-        }
-        }
+        m_vector_of_record_handle_structures->push_back(new string_record_handle_t(m__io, this, m__root));
     }
 }
 
@@ -352,6 +458,9 @@ column_data_dictionary_t::dictionary_record_handles_vector_t::~dictionary_record
 
 void column_data_dictionary_t::dictionary_record_handles_vector_t::_clean_up() {
     if (m_vector_of_record_handle_structures) {
+        for (std::vector<string_record_handle_t*>::iterator it = m_vector_of_record_handle_structures->begin(); it != m_vector_of_record_handle_structures->end(); ++it) {
+            delete *it;
+        }
         delete m_vector_of_record_handle_structures; m_vector_of_record_handle_structures = 0;
     }
 }

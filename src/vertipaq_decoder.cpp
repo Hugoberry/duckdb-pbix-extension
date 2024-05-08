@@ -1,5 +1,6 @@
 #include "vertipaq_decoder.hpp"
 #include <iostream>
+#include "huffman_decoder.h"
 namespace duckdb
 {
     std::vector<uint64_t> VertipaqDecoder::readBitPacked(const std::vector<uint64_t> &sub_segment, uint64_t bit_width, uint64_t min_data_id)
@@ -29,20 +30,55 @@ namespace duckdb
         {
             // Handling string-based dictionary
             std::map<uint64_t, std::string> hashtable;
-
-            // Assuming there's only one dictionary page for simplification
-            auto stringData = static_cast<column_data_dictionary_t::string_data_t *>(dictionary.data());
-            auto page = stringData->dictionary_pages();
-            std::string uncompressed = page->string_store()->uncompressed_character_buffer();
-
-            // Extracting strings and filling the hashtable
-            std::istringstream ss(uncompressed);
-            std::string token;
             int index = min_data_id;
-            while (std::getline(ss, token, '\0'))
-            { // assuming null-terminated strings in buffer
-                hashtable[index++] = token;
+
+            auto stringData = static_cast<column_data_dictionary_t::string_data_t*>(dictionary.data());
+            auto pages = stringData->dictionary_pages();
+            auto record_handles = stringData->dictionary_record_handles_vector_info()->vector_of_record_handle_structures();
+            std::unordered_map<int, std::vector<int>> record_handles_map;
+
+            // make record_handle a map of page_id and bit_or_byte_offset
+            for (const auto& handle : *record_handles) {
+                record_handles_map[handle->page_id()].push_back(handle->bit_or_byte_offset());
             }
+            
+            for(int page_id = 0; page_id < pages->size(); page_id++){
+                const auto& page = pages->at(page_id);
+                if(page->page_compressed()){
+                    auto compressed_store = static_cast<column_data_dictionary_t::compressed_strings_t*>(page->string_store());
+                    auto encode_array = compressed_store->encode_array();
+                    auto store_total_bits = compressed_store->store_total_bits();
+                    auto compressed_string_buffer = compressed_store->compressed_string_buffer();
+                    auto ui_decode_bits = compressed_store->ui_decode_bits();
+
+                    auto full_encode_array = decompress_encode_array(*encode_array);
+
+                    HuffmanTree* huffman_tree = build_huffman_tree(full_encode_array);
+
+                    auto it = record_handles_map.find(page_id);
+                    if (it != record_handles_map.end()) {
+                        for (size_t i = 0; i < it->second.size(); i++) {
+                            uint32_t start_bit = it->second[i];
+                            uint32_t end_bit = (i + 1 < it->second.size()) ? it->second[i + 1] : store_total_bits; // end of the compressed buffer
+                            std::string decompressed = decode_substring(compressed_string_buffer, huffman_tree, start_bit, end_bit);
+
+                            hashtable[index++] = decompressed;
+                        }
+                    }
+                    delete huffman_tree;
+                } else {
+                    auto uncompressed_store = static_cast<column_data_dictionary_t::uncompressed_strings_t *>(page->string_store());
+                    auto uncompressed = uncompressed_store->uncompressed_character_buffer();
+                    // Extracting strings from the uncompressed buffer
+                    std::istringstream ss(uncompressed);
+                    std::string token;
+                    while (std::getline(ss, token, '\0'))
+                    { // assuming null-terminated strings in buffer
+                        hashtable[index++] = token;
+                    }
+                }
+
+            } // end loop all pages
             return hashtable;
         }
         else if (dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_LONG ||
@@ -218,10 +254,6 @@ namespace duckdb
         std::string idf_meta_stream(all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader + vfiles[idf_metadata].Size);
         std::istringstream is(idf_meta_stream);
         IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
-        // read dictionary file
-        std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
-        auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
-        // read IDF
         auto correction = error_code ? 4 : 0;
         std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size - correction);
 
@@ -229,6 +261,10 @@ namespace duckdb
 
         auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
 
+        // read dictionary file
+        std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
+        auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
+        // read IDF
         std::vector<std::string> output;
         for (int i = 0; i < vector.size(); i++)
         {
@@ -261,4 +297,39 @@ namespace duckdb
 
         return output;
     }
+/*
+    void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::Vector &output) {
+        // Common processing
+        std::string idf_metadata = details.IDF + "meta";
+        auto &meta_file = vfiles[idf_metadata];
+        std::string idf_meta_stream(all_decompressed_data.begin() + meta_file.m_cbOffsetHeader, 
+                                    all_decompressed_data.begin() + meta_file.m_cbOffsetHeader + meta_file.Size);
+        IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
+
+        // Read IDF with error correction
+        int correction = error_code ? 4 : 0;
+        auto &idf_file = vfiles[details.IDF];
+        std::string idf_stream(all_decompressed_data.begin() + idf_file.m_cbOffsetHeader, 
+                            all_decompressed_data.begin() + idf_file.m_cbOffsetHeader + idf_file.Size - correction);
+
+        // Decode data
+        auto decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
+
+        // Type-specific processing directly into DuckDB vector
+        // if (details.DataType == STRING_TYPE) {
+        if (details.DataType == 2) {
+            std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader,
+                                        all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
+            auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
+            // duckdb::FlatVector::SetData(output, (duckdb::data_ptr_t)dictionary.data()); // Example setting vector data
+        } else {
+            // Assuming integer processing
+            std::vector<int64_t> processed_values;
+            for (auto idx : decoded_indices) {
+                processed_values.push_back((idx + details.BaseId) / details.Magnitude);
+            }
+            duckdb::FlatVector::SetData(output, (duckdb::data_ptr_t)processed_values.data());
+        }
+    }
+*/
 } // namespace duckdb
