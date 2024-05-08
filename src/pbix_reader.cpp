@@ -281,6 +281,9 @@ namespace duckdb
 					{
 						if(details.DataType== 10) {
 							output.SetValue(col_idx,i,duckdb::Value(std::stoi(result_vec[i])/10000.0000));
+						} else if(details.DataType==9) {
+							auto dd = date_t(0) + static_cast<int>(std::stod(result_vec[i])) - 25566 - 3; //- days between (1900 - 1970) - 3 min_id (need to replace with real min_id)
+							output.SetValue(col_idx,i,duckdb::Value::DATE(dd));
 						} else {
 							output.SetValue(col_idx,i,result_vec[i]);
 						

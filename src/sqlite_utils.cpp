@@ -125,7 +125,7 @@ LogicalType SQLiteUtils::VertipaqTypeToLogicalType(const uint8_t &vertipaq_type)
 	case 8:
 		return LogicalType::DOUBLE;
 	case 9:
-		return LogicalType::TIMESTAMP;
+		return LogicalType::DATE;
 	case 10:
 		return LogicalType::DECIMAL(16,4);
 	case 11:
