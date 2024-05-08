@@ -1,6 +1,15 @@
 #include "huffman_decoder.h"
 
-
+std::string iso88591_to_utf8(uint8_t code) {
+    std::string utf8;
+    if (code >= 0x80) {
+        utf8.push_back(static_cast<char>(0xC2 + (code > 0xBF)));
+        utf8.push_back(static_cast<char>((code & 0x3F) + 0x80));
+    } else {
+        utf8.push_back(static_cast<char>(code));
+    }
+    return utf8;
+}
 
 // Function to generate the full 256-byte Huffman array from the compact 128-byte encode_array
 std::vector<uint8_t> decompress_encode_array(const std::vector<uint8_t>& compressed) {
@@ -94,7 +103,7 @@ std::string decode_substring(const std::string& bitstream, HuffmanTree* tree, ui
         byte_pos = (byte_pos & ~0x01) + (1 - (byte_pos & 0x01));
 
         if (!node->left && !node->right) {
-            result += (char)(node->c);
+            result += iso88591_to_utf8(node->c);
             node = tree; // Reset to the root node
         }
 
@@ -108,7 +117,7 @@ std::string decode_substring(const std::string& bitstream, HuffmanTree* tree, ui
 
     // Append the last character if the final node is a leaf
     if (!node->left && !node->right) {
-        result += (char)(node->c);
+        result += iso88591_to_utf8(node->c);
     }
 
     return result;

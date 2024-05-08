@@ -11,7 +11,7 @@
 
 // Huffman Tree Node definition
 struct HuffmanTree {
-    char c;
+    uint8_t c;
     HuffmanTree* left;
     HuffmanTree* right;
 
