@@ -271,8 +271,6 @@ namespace duckdb
 				idx_t col_idx = details.StoragePosition - 1;
 				auto &out_vec = output.data[col_idx];
 
-				std::cout << "Details " << details.StoragePosition << " " << details.DataType << " " << details.Dictionary << " " << details.IDF << " " << details.BaseId << " " << details.Magnitude << " " << details.IsNullable << std::endl;
-
 				if (dictionary)
 				{
 					// Process string data

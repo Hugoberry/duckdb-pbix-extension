@@ -30,117 +30,56 @@ namespace duckdb
         {
             // Handling string-based dictionary
             std::map<uint64_t, std::string> hashtable;
+            int index = min_data_id;
 
-            // Assuming there's only one dictionary page for simplification
-            auto stringData = static_cast<column_data_dictionary_t::string_data_t *>(dictionary.data());
-            auto page = stringData->dictionary_pages();
-            if (page->page_compressed())
-            {
-                auto compressed_store = static_cast<column_data_dictionary_t::compressed_strings_t *>(page->string_store());
-                auto encode_array = compressed_store->encode_array();
-                auto store_total_bits = compressed_store->store_total_bits();
-                auto character_set_used = compressed_store->character_set_used();
-                auto record_handles = stringData->dictionary_record_handles_vector_info()->vector_of_record_handle_structures();
+            auto stringData = static_cast<column_data_dictionary_t::string_data_t*>(dictionary.data());
+            auto pages = stringData->dictionary_pages();
+            auto record_handles = stringData->dictionary_record_handles_vector_info()->vector_of_record_handle_structures();
+            std::unordered_map<int, std::vector<int>> record_handles_map;
 
-                std::vector<uint8_t> target_vector(encode_array->begin(), encode_array->end());
-                auto ui_decode_bits =  compressed_store->ui_decode_bits();
-                auto compressed_string_buffer = compressed_store->compressed_string_buffer();
-
-                // Reconstruct the Huffman tree
-                std::vector<uint8_t> huffmanTree = ReconstructHuffmanTree(target_vector, ui_decode_bits);
-
-                for(auto i : huffmanTree) {
-                    std::cout << static_cast<int>(i) << " ";
-                }
-                
-                // Decode the bit stream
-                // std::string bitStream(reinterpret_cast<const char*>(compressed_string_buffer), store_total_bits);
-                
-                // Extract individual strings based on record handles
-                std::vector<std::string> decodedStrings;
-                auto& handles = *record_handles;
-                
-                for (size_t i = 0; i < handles.size(); ++i) {
-                    uint32_t startBit = static_cast<uint32_t>(handles[i]);
-                    uint32_t endBit = store_total_bits;
-
-                    // Set endBit based on the next handle, if it exists
-                    if (i + 1 < handles.size()) {
-                        endBit = static_cast<uint32_t>(handles[i + 1]);
-                    }
-
-                    // Convert bit positions to byte offsets for substr
-                    size_t startByte = startBit / 8;
-                    size_t endByte = (endBit + 7) / 8; // ceil(endBit / 8.0)
-
-                    std::string stringBitStream = compressed_string_buffer.substr(startByte, endByte - startByte);
-                    
-                    std::cout << "String Bit Stream: " << stringBitStream << std::endl;
-                    std::cout << "Start Bit: " << startBit << " End Bit: " << endBit << std::endl;
-                    // Decode the bit stream using the mock function
-                    auto decodedString = DecodeBitStream(huffmanTree, stringBitStream, character_set_used);
-
-                    // std::cout << "Decoded String: " << decodedString << std::endl;
-                    decodedStrings.push_back(decodedString);
-                }
-/*
-                
-                // Huffman decode table
-                HuffmanTable decodeTable(256);
-                createDecodeTables(target_vector, decodeTable, ui_decode_bits, ui_decode_bits);
-                size_t offset = 0; // Offset in bits
-                std::vector<uint16_t> decodedSymbols;
-                
-                // Assuming you know the expected number of symbols
-                while (offset < store_total_bits) {
-                    auto decodedSymbol = huffmanDecodeSymbol(compressed_string_buffer, offset, store_total_bits, decodeTable, ui_decode_bits, ui_decode_bits); // tailBits of 4
-                    std::cout << "Decoded Symbol: " << decodedSymbol << std::endl;
-                    decodedSymbols.push_back(decodedSymbol);
-                }
-
-                // Convert decoded symbols to a string (assuming it's ASCII or similar)
-                std::string decodedString;
-                for (const auto& symbol : decodedSymbols) {
-                    decodedString += static_cast<char>(symbol);
-                }
-
-                std::cout << "Decoded String: " << decodedString << std::endl;
-*/
-                // Assuming you have a status structure for error handling
-                // XPRESS9_STATUS status = {0}; // Make sure the status is initialized correctly
-                // HUFFMAN_DECODE_TABLE_ENTRY decodeTable[65536]; // Example size, adjust as needed
-                // HUFFMAN_DECODE_NODE scratch[256 * 2]; // Temporary scratch space for node storage
-
-                // // Fill decoding tables
-                // uint32_t decodeTableSize = sizeof(decodeTable) / sizeof(decodeTable[0]);
-                // HUFFMAN_DECODE_TABLE_ENTRY* tableEntriesUsedPtr = HuffmanCreateDecodeTables(
-                //     &status,
-                //     encode_array,
-                //     256, // Alphabet size
-                //     decodeTable,
-                //     decodeTableSize,
-                //     ui_decode_bits, // Root bits determined by your uiDecodeBits
-                //     ui_decode_bits, // Tail bits could be the same or different
-                //     scratch
-                // );
-                // Now you can decode using decodeTable and CompressedStringBuffer
-
-                //cout the decoded table
-                              
-                throw std::runtime_error("Compressed string dictionary not supported");
-            } else {
-                auto uncompressed_store = static_cast<column_data_dictionary_t::uncompressed_strings_t *>(page->string_store());
-                std::string uncompressed = uncompressed_store->uncompressed_character_buffer();
-                // Extracting strings and filling the hashtable
-                std::istringstream ss(uncompressed);
-                std::string token;
-                int index = min_data_id;
-                while (std::getline(ss, token, '\0'))
-                { // assuming null-terminated strings in buffer
-                    hashtable[index++] = token;
-                }
-                return hashtable;
+            // make record_handle a map of page_id and bit_or_byte_offset
+            for (const auto& handle : *record_handles) {
+                record_handles_map[handle->page_id()].push_back(handle->bit_or_byte_offset());
             }
+            
+            for(int page_id = 0; page_id < pages->size(); page_id++){
+                const auto& page = pages->at(page_id);
+                if(page->page_compressed()){
+                    auto compressed_store = static_cast<column_data_dictionary_t::compressed_strings_t*>(page->string_store());
+                    auto encode_array = compressed_store->encode_array();
+                    auto store_total_bits = compressed_store->store_total_bits();
+                    auto compressed_string_buffer = compressed_store->compressed_string_buffer();
+                    auto ui_decode_bits = compressed_store->ui_decode_bits();
+
+                    auto full_encode_array = decompress_encode_array(*encode_array);
+
+                    HuffmanTree* huffman_tree = build_huffman_tree(full_encode_array);
+
+                    auto it = record_handles_map.find(page_id);
+                    if (it != record_handles_map.end()) {
+                        for (size_t i = 0; i < it->second.size(); i++) {
+                            uint32_t start_bit = it->second[i];
+                            uint32_t end_bit = (i + 1 < it->second.size()) ? it->second[i + 1] : store_total_bits; // end of the compressed buffer
+                            std::string decompressed = decode_substring(compressed_string_buffer, huffman_tree, start_bit, end_bit);
+
+                            hashtable[index++] = decompressed;
+                        }
+                    }
+                    delete huffman_tree;
+                } else {
+                    auto uncompressed_store = static_cast<column_data_dictionary_t::uncompressed_strings_t *>(page->string_store());
+                    auto uncompressed = uncompressed_store->uncompressed_character_buffer();
+                    // Extracting strings from the uncompressed buffer
+                    std::istringstream ss(uncompressed);
+                    std::string token;
+                    while (std::getline(ss, token, '\0'))
+                    { // assuming null-terminated strings in buffer
+                        hashtable[index++] = token;
+                    }
+                }
+
+            } // end loop all pages
+            return hashtable;
         }
         else if (dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_LONG ||
                  dictionary.dictionary_type() == column_data_dictionary_t::DICTIONARY_TYPES_XM_TYPE_REAL)
@@ -315,10 +254,6 @@ namespace duckdb
         std::string idf_meta_stream(all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader + vfiles[idf_metadata].Size);
         std::istringstream is(idf_meta_stream);
         IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
-        // read dictionary file
-        std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
-        auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
-        // read IDF
         auto correction = error_code ? 4 : 0;
         std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size - correction);
 
@@ -326,6 +261,10 @@ namespace duckdb
 
         auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
 
+        // read dictionary file
+        std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
+        auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
+        // read IDF
         std::vector<std::string> output;
         for (int i = 0; i < vector.size(); i++)
         {
