@@ -273,7 +273,7 @@ static string SqliteToString(const FunctionData *bind_data_p) {
 }
 
 PbixScanFunction::PbixScanFunction()
-    : TableFunction("pbix_scan", {LogicalType::VARCHAR, LogicalType::VARCHAR}, PbixScan, PbixBind,
+    : TableFunction("pbix_meta", {LogicalType::VARCHAR, LogicalType::VARCHAR}, PbixScan, PbixBind,
                     PbixInitGlobalState, PbixInitLocalState) {
 	cardinality = PbixCardinality;
 	to_string = SqliteToString;

@@ -4,9 +4,7 @@
 #include <vector>
 #include <tuple>
 #include "backup_log_header.h"
-#include "backup_file.h"
 #include "virtual_directory.h"
-#include "backup_file.h"
 #include "backup_log.h"
 
 #include <fstream>

@@ -112,3 +112,182 @@ BackupLog BackupLog::from_xml(const std::vector<uint8_t>& buffer, const std::str
 
     return log;
 }
+
+Collations Collations::from_xml(tinyxml2::XMLElement& element) {
+    Collations collations;
+
+    // Iterate over each "Collation" child element
+    XMLElement* collationElement = element.FirstChildElement("Collation");
+    while (collationElement) {
+        // Get the collation string and add it to the vector
+        std::string collation = collationElement->GetText();
+        if (!collations.Collation) {
+            collations.Collation = std::vector<std::string>{};
+        }
+        collations.Collation->push_back(collation);
+
+        // Move to the next "Collation" sibling element
+        collationElement = collationElement->NextSiblingElement("Collation");
+    }
+
+    return collations;
+}
+
+Languages Languages::from_xml(tinyxml2::XMLElement& element) {
+    Languages languages;
+
+    // Iterate over each "Language" child element
+    XMLElement* languageElement = element.FirstChildElement("Language");
+    while (languageElement) {
+        // Parse the language int and add it to the vector
+        int language = std::stoi(languageElement->GetText());
+        if (!languages.Language) {
+            languages.Language = std::vector<int>{};
+        }
+        languages.Language->push_back(language);
+
+        // Move to the next "Language" sibling element
+        languageElement = languageElement->NextSiblingElement("Language");
+    }
+
+    return languages;
+}
+
+FileGroup FileGroup::from_xml(tinyxml2::XMLElement& element) {
+    FileGroup fileGroup;
+
+    XMLElement* classElement = element.FirstChildElement("Class");
+    if (classElement && classElement->GetText()) {
+        fileGroup.Class = std::stoi(classElement->GetText());
+    }
+    else {
+        throw std::runtime_error("Invalid XML: Missing or empty 'Class' in 'FileGroup'.");
+    }
+
+    XMLElement* idElement = element.FirstChildElement("ID");
+    if (idElement && idElement->GetText()) {
+        fileGroup.ID = idElement->GetText();
+    }
+
+    XMLElement* nameElement = element.FirstChildElement("Name");
+    if (nameElement && nameElement->GetText()) {
+        fileGroup.Name = nameElement->GetText();
+    }
+
+    XMLElement* objectVersionElement = element.FirstChildElement("ObjectVersion");
+    if (objectVersionElement && objectVersionElement->GetText()) {
+        fileGroup.ObjectVersion = std::stoi(objectVersionElement->GetText());
+    }
+    else {
+        throw std::runtime_error("Invalid XML: Missing or empty 'ObjectVersion' in 'FileGroup'.");
+    }
+
+    XMLElement* persistLocationElement = element.FirstChildElement("PersistLocation");
+    if (persistLocationElement && persistLocationElement->GetText()) {
+        fileGroup.PersistLocation = std::stoi(persistLocationElement->GetText());
+    }
+    else {
+        throw std::runtime_error("Invalid XML: Missing or empty 'PersistLocation' in 'FileGroup'.");
+    }
+
+    XMLElement* persistLocationPathElement = element.FirstChildElement("PersistLocationPath");
+    if (persistLocationPathElement && persistLocationPathElement->GetText()) {
+        fileGroup.PersistLocationPath = persistLocationPathElement->GetText();
+    }
+
+    XMLElement* storageLocationPathElement = element.FirstChildElement("StorageLocationPath");
+    if (storageLocationPathElement && storageLocationPathElement->GetText()) {
+        fileGroup.StorageLocationPath = storageLocationPathElement->GetText();
+    }
+
+    XMLElement* objectIDElement = element.FirstChildElement("ObjectID");
+    if (objectIDElement && objectIDElement->GetText()) {
+        fileGroup.ObjectID = objectIDElement->GetText();
+    }
+
+    XMLElement* fileListElement = element.FirstChildElement("FileList");
+    while (fileListElement) {
+        FileList fileList = FileList::from_xml(*fileListElement);
+        if (!fileGroup.FileLists) {
+            fileGroup.FileLists = std::vector<FileList>{};
+        }
+        fileGroup.FileLists->push_back(fileList);
+        fileListElement = fileListElement->NextSiblingElement("FileList");
+    }
+
+    return fileGroup;
+}
+
+
+FileGroups FileGroups::from_xml(tinyxml2::XMLElement& element) {
+    FileGroups fileGroups;
+
+    // Iterate over each "FileGroup" child element
+    XMLElement* fileGroupElement = element.FirstChildElement("FileGroup");
+    while (fileGroupElement) {
+        // Deserialize the FileGroup and add it to the vector
+        FileGroup fileGroup = FileGroup::from_xml(*fileGroupElement);
+        if (!fileGroups.FileGroupList) {
+            fileGroups.FileGroupList = std::vector<FileGroup>{};
+        }
+        fileGroups.FileGroupList->push_back(fileGroup);
+
+        // Move to the next "FileGroup" sibling element
+        fileGroupElement = fileGroupElement->NextSiblingElement("FileGroup");
+    }
+
+    return fileGroups;
+}
+
+FileList FileList::from_xml(tinyxml2::XMLElement& element) {
+    FileList fileList;
+
+    XMLElement* backupFileElement = element.FirstChildElement("BackupFile");
+    while (backupFileElement) {
+        LogBackupFile file = LogBackupFile::from_value(*backupFileElement,"UTF-8");
+        if (!fileList.BackupFiles) {
+            fileList.BackupFiles = std::vector<LogBackupFile>{};
+        }
+        fileList.BackupFiles->push_back(file);
+        backupFileElement = backupFileElement->NextSiblingElement("BackupFile");
+    }
+
+    return fileList;
+}
+
+LogBackupFile LogBackupFile::from_value(tinyxml2::XMLElement& element, const std::string& encoding) {
+    LogBackupFile file;
+    XMLElement* pathElement = element.FirstChildElement("Path");
+    if (pathElement && pathElement->GetText()) {
+        file.Path = std::string(pathElement->GetText());
+    }
+    XMLElement* sizeElement = element.FirstChildElement("Size");
+    if (sizeElement && sizeElement->GetText()) {
+        file.Size = std::stoi(sizeElement->GetText());
+    }
+    XMLElement* storagePathElement = element.FirstChildElement("StoragePath");
+    if (storagePathElement && storagePathElement->GetText()) {
+        file.StoragePath = std::string(storagePathElement->GetText());
+    }
+    XMLElement* lastWriteTimeElement = element.FirstChildElement("LastWriteTime");
+    if (lastWriteTimeElement && lastWriteTimeElement->GetText()) {
+        file.LastWriteTime = std::stoll(lastWriteTimeElement->GetText());
+    }
+
+    return file;
+}
+
+LogBackupFile LogBackupFile::from_xml(const std::vector<uint8_t>& buffer, const std::string& encoding) {
+    XMLDocument doc;
+    XMLError error = doc.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+    if (error != XML_SUCCESS) {
+        throw std::runtime_error("Error deserializing XML buffer: " + std::to_string(error));
+    }
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        return LogBackupFile::from_value(*root, encoding);
+    }
+
+    return LogBackupFile{};
+}

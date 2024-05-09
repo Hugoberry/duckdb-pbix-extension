@@ -4,16 +4,16 @@
 
 # Before we load the extension, this will fail
 statement error
-SELECT * FROM pbix_scan('data/sales.pbix','table');
+SELECT * FROM pbix_meta('data/sales.pbix','table');
 ----
-Catalog Error: Table Function with name pbix_scan does not exist!
+Catalog Error: Table Function with name pbix_meta does not exist!
 
 # Require statement will ensure this test is run with this extension loaded
 require pbix
 
 # Confirm the extension works
 query I
-SELECT Name FROM pbix_scan('data/sales.pbix','table') WHERE isHidden=0 ORDER BY Name;
+SELECT Name FROM pbix_meta('data/sales.pbix','table') WHERE isHidden=0 ORDER BY Name;
 ----
 Geo
 Online Sales

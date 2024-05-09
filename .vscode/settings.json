@@ -95,6 +95,8 @@
         "string_view": "cpp",
         "shared_mutex": "cpp",
         "any": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp"
     }
 }

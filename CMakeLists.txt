@@ -40,15 +40,9 @@ set(KAITAI_SOURCES
 
 SET(ABF_SOURCES
     src/abf/abf_parser.cpp
-    src/abf/backup_file.cpp
     src/abf/backup_log_header.cpp
     src/abf/backup_log.cpp
-    src/abf/collations.cpp
     src/abf/crc32.c
-    src/abf/file_group.cpp
-    src/abf/file_list.cpp
-    src/abf/languages.cpp
-    src/abf/log_backup_file.cpp
     src/abf/virtual_directory.cpp
     src/abf/zip_utils.cpp)
 
