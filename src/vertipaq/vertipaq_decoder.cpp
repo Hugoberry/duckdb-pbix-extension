@@ -242,63 +242,7 @@ namespace duckdb
         }
     }
 
-    std::vector<std::string> VertipaqDecoder::processVertipaqStr(VertipaqDetails &details, VertipaqFiles &vfiles)
-    {
-
-        if (details.Dictionary.empty())
-        {
-            throw std::runtime_error("Dictionary is empty");
-        }
-        // append 'meta' to IDF filename
-        std::string idf_metadata = details.IDF + "meta";
-        std::string idf_meta_stream(all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader + vfiles[idf_metadata].Size);
-        std::istringstream is(idf_meta_stream);
-        IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
-        auto correction = error_code ? 4 : 0;
-        std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size - correction);
-
-        int null_adjustment = details.IsNullable && details.DataType==2 ? 1 : 0;
-
-        auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
-
-        // read dictionary file
-        std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
-        auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
-        // read IDF
-        std::vector<std::string> output;
-        for (int i = 0; i < vector.size(); i++)
-        {
-            output.push_back(dictionary[vector[i]]);
-        }
-        return output;
-    }
-
-    std::vector<uint64_t> VertipaqDecoder::processVertipaqInt(VertipaqDetails &details, VertipaqFiles &vfiles)
-    {
-
-        // append 'meta' to IDF filename
-        std::string idf_metadata = details.IDF + "meta";
-        std::string idf_meta_stream(all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[idf_metadata].m_cbOffsetHeader + vfiles[idf_metadata].Size);
-        std::istringstream is(idf_meta_stream);
-        IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
-        std::map<uint64_t, std::string> dictionary;
-
-        // read IDF
-        auto correction = error_code ? 4 : 0;
-        std::string idf_stream(all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.IDF].m_cbOffsetHeader + vfiles[details.IDF].Size - correction);
-
-        auto vector = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
-
-        std::vector<uint64_t> output;
-        for (int i = 0; i < vector.size(); i++)
-        {
-            output.push_back((vector[i] + details.BaseId) / details.Magnitude);
-        }
-
-        return output;
-    }
-/*
-    void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::Vector &output) {
+    void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::DataChunk &output, idx_t &out_idx, idx_t col_idx) {
         // Common processing
         std::string idf_metadata = details.IDF + "meta";
         auto &meta_file = vfiles[idf_metadata];
@@ -312,24 +256,63 @@ namespace duckdb
         std::string idf_stream(all_decompressed_data.begin() + idf_file.m_cbOffsetHeader, 
                             all_decompressed_data.begin() + idf_file.m_cbOffsetHeader + idf_file.Size - correction);
 
-        // Decode data
-        auto decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
+        //if isNullable treat min_data_id as blank
+        int null_adjustment = details.IsNullable && details.DataType==2 ? 1 : 0;
 
-        // Type-specific processing directly into DuckDB vector
-        // if (details.DataType == STRING_TYPE) {
-        if (details.DataType == 2) {
-            std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader,
-                                        all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
+        auto decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
+
+        if (details.Dictionary != "")
+        {
+            // read dictionary file
+            std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
             auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
-            // duckdb::FlatVector::SetData(output, (duckdb::data_ptr_t)dictionary.data()); // Example setting vector data
-        } else {
-            // Assuming integer processing
-            std::vector<int64_t> processed_values;
-            for (auto idx : decoded_indices) {
-                processed_values.push_back((idx + details.BaseId) / details.Magnitude);
+
+            if (details.DataType == 10) // FLOAT or DOUBLE
+            {
+                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
+                {
+                    auto val = dictionary[decoded_indices[i]];
+                    output.SetValue(col_idx, i, duckdb::Value(std::stoi(val) / 10000.0000));
+                    out_idx++;
+                }
             }
-            duckdb::FlatVector::SetData(output, (duckdb::data_ptr_t)processed_values.data());
+            else if (details.DataType == 9) // DATE
+            {
+                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
+                {
+                    auto val = dictionary[decoded_indices[i]];
+                    auto dd = date_t(0) + static_cast<int>(std::stod(val)) - EPOCH_ADJUSTMENT - idf_m.min_data_id; // days between (1900 - 1970)
+                    output.SetValue(col_idx, i, duckdb::Value::DATE(dd));
+                    out_idx++;
+                }
+            }
+            else
+            {
+                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
+                {
+                    auto val = dictionary[decoded_indices[i]];
+                    output.SetValue(col_idx, i, val);
+                    out_idx++;
+                }
+            }
+        } else {
+            if(details.DataType == 10) //DOUBLE or FLOAT
+            {
+                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
+                {
+                    auto val = (decoded_indices[i] + details.BaseId) / details.Magnitude / 10000.0000;
+                    output.SetValue(col_idx, i, val);
+                    out_idx++;
+                }
+            } else {
+                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
+                {
+                    auto val = (decoded_indices[i] + details.BaseId) / details.Magnitude;
+                    output.SetValue(col_idx, i, duckdb::Value::BIGINT(val));
+                    out_idx++;
+                }
+            }
         }
     }
-*/
+
 } // namespace duckdb

@@ -269,43 +269,8 @@ namespace duckdb
 				};
 		
 				// idx_t col_idx = details.StoragePosition - 1;
-				auto &out_vec = output.data[col_idx];
-
-				if (dictionary)
-				{
-					// Process string data
-					auto result_vec = vdecoder.processVertipaqStr(details, vertipaq_files);
-					out_idx +=std::min<int>(result_vec.size(), STANDARD_VECTOR_SIZE);
-
-					for(idx_t i = 0; i < std::min<int>(result_vec.size(), STANDARD_VECTOR_SIZE); i++)
-					{
-						if(details.DataType== 10) {
-							output.SetValue(col_idx,i,duckdb::Value(std::stoi(result_vec[i])/10000.0000));
-						} else if(details.DataType==9) {
-							auto dd = date_t(0) + static_cast<int>(std::stod(result_vec[i])) - 25566 - 3; //- days between (1900 - 1970) - 3 min_id (need to replace with real min_id)
-							output.SetValue(col_idx,i,duckdb::Value::DATE(dd));
-						} else {
-							output.SetValue(col_idx,i,result_vec[i]);
-						
-						}
-					}
-				}
-				else
-				{
-					// Process integer data
-					auto result_vec = vdecoder.processVertipaqInt(details, vertipaq_files);
-					out_idx += std::min<int>(result_vec.size(), STANDARD_VECTOR_SIZE);
-					for(idx_t i = 0; i < std::min<int>(result_vec.size(), STANDARD_VECTOR_SIZE); i++)
-					{
-						if(details.DataType== 10) {
-							// std::cout << result_vec[i] <<" " <<std::endl;
-							output.SetValue(col_idx,i,duckdb::Value(result_vec[i]/10000.0000));
-						} else {
-							output.SetValue(col_idx,i,duckdb::Value::BIGINT(result_vec[i]));
-						}
-					}
-				}
-				
+				// auto &out_vec = output.data[col_idx];
+				vdecoder.processVertipaqData(details, vertipaq_files, output, out_idx, col_idx);
 				col_idx++;
 			}
 		

@@ -17,6 +17,7 @@
 #include "duckdb/main/client_context.hpp"
 namespace duckdb
 {
+    constexpr uint32_t EPOCH_ADJUSTMENT = 25566; //days between (1900 - 1970)
     class VertipaqDecoder
     {
     
@@ -31,8 +32,6 @@ namespace duckdb
         std::vector<uint64_t> readRLEBitPackedHybrid(std::string &str, uint64_t entries, uint64_t min_data_id, uint64_t bit_width);
         std::map<uint64_t, std::string> readDictionary(std::string &dictionary_stream, uint64_t min_data_id);
         IdfMetadata readIdfMetadata(std::string &stream);
-        std::vector<std::string> processVertipaqStr(VertipaqDetails &details, VertipaqFiles &vfiles);
-        std::vector<uint64_t> processVertipaqInt(VertipaqDetails &details, VertipaqFiles &vfiles);
-        void processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::Vector &output);
+        void processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::DataChunk &output, idx_t &out_idx, idx_t col_idx);
     };
 } // namespace duckdb
