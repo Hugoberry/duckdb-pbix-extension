@@ -35,9 +35,9 @@ The main binaries that will be built are:
 ## Running the extension
 To run the extension code, simply start the shell with `./build/release/duckdb`.
 
-Now we can use the features from the extension directly in DuckDB. The template contains a single scalar function `pbix()` that takes a string arguments and returns a string:
+Now we can use the features from the extension directly in DuckDB. The template contains a single scalar function `pbix_meta()` that takes two string arguments (filename and metadata table) and returns the contents of the metadata table:
 ```
-D select pbix('Jane') as result;
+D select * from pbix_meta('some.pbix','table');
 ┌───────────────┐
 │    result     │
 │    varchar    │
@@ -74,7 +74,7 @@ db = new duckdb.Database(':memory:', {"allow_unsigned_extensions": "true"});
 Secondly, you will need to set the repository endpoint in DuckDB to the HTTP url of your bucket + version of the extension
 you want to install. To do this run the following SQL query in DuckDB:
 ```sql
-SET custom_extension_repository='bucket.s3.eu-west-1.amazonaws.com/<your_extension_name>/latest';
+SET custom_extension_repository='https://duckdb.pbix.info';
 ```
 Note that the `/latest` path will allow you to install the latest extension version available for your current version of
 DuckDB. To specify a specific version, you can pass the version instead.

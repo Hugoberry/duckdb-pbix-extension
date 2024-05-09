@@ -21,6 +21,7 @@ include_directories(third_party/xpress9)
 include_directories(third_party/kaitai)
 include_directories(third_party)
 include_directories(src/abf)
+include_directories(src/vertipaq)
 
 set(SQLITE_SOURCES
     third_party/sqlite/sqlite3.c
@@ -46,6 +47,13 @@ SET(ABF_SOURCES
     src/abf/virtual_directory.cpp
     src/abf/zip_utils.cpp)
 
+SET(VERTIPAQ_SOURCES
+    src/vertipaq/vertipaq_decoder.cpp
+    src/vertipaq/column_data_idfmeta.cpp
+    src/vertipaq/column_data_idf.cpp
+    src/vertipaq/column_data_dictionary.cpp
+    src/vertipaq/huffman_decoder.cpp)
+
 set(EXTENSION_SOURCES 
     src/pbix_extension.cpp
     src/pbix_scanner.cpp
@@ -53,16 +61,12 @@ set(EXTENSION_SOURCES
     src/sqlite_db.cpp 
     src/sqlite_stmt.cpp
     src/sqlite_utils.cpp
-    src/vertipaq_decoder.cpp
-    src/column_data_idfmeta.cpp
-    src/column_data_idf.cpp
-    src/column_data_dictionary.cpp
-    src/huffman_decoder.cpp
     ${KAITAI_SOURCES}
     ${SQLITE_SOURCES}
     ${TINYXML2_SOURCES}
     ${XPRESS9_SOURCES}
-    ${ABF_SOURCES})
+    ${ABF_SOURCES}
+    ${VERTIPAQ_SOURCES})
 
 # build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 # build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
