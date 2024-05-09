@@ -233,6 +233,7 @@ namespace duckdb
 		// {
 
 			idx_t out_idx = 0;
+			idx_t col_idx = 0;
 			while (true)
 			{
 				if (state.done)	return;
@@ -267,8 +268,7 @@ namespace duckdb
 					sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(7))
 				};
 		
-
-				idx_t col_idx = details.StoragePosition - 1;
+				// idx_t col_idx = details.StoragePosition - 1;
 				auto &out_vec = output.data[col_idx];
 
 				if (dictionary)
@@ -305,6 +305,8 @@ namespace duckdb
 						}
 					}
 				}
+				
+				col_idx++;
 			}
 		
 	}
