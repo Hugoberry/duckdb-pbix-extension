@@ -30,39 +30,6 @@ SQLiteDB &SQLiteDB::operator=(SQLiteDB &&other) noexcept {
 	return *this;
 }
 
-SQLiteDB SQLiteDB::Open(const string &path, const SQLiteOpenOptions &options, bool is_shared) {
-	SQLiteDB result;
-	int flags = SQLITE_OPEN_PRIVATECACHE;
-	if (options.access_mode == AccessMode::READ_ONLY) {
-		flags |= SQLITE_OPEN_READONLY;
-	} else {
-		flags |= SQLITE_OPEN_READWRITE ;//| SQLITE_OPEN_CREATE;
-	}
-	if (!is_shared) {
-		// FIXME: we should just make sure we are not re-using the same `sqlite3`
-		// object across threads
-		flags |= SQLITE_OPEN_NOMUTEX;
-	}
-	//flags |= SQLITE_OPEN_EXRESCODE;
-	auto rc = sqlite3_open_v2(path.c_str(), &result.db, flags, nullptr);
-	if (rc != SQLITE_OK) {
-		throw std::runtime_error("Unable to open database \"" + path + "\": " + string(sqlite3_errstr(rc)));
-	}
-	// default busy time-out of 5 seconds
-	if (options.busy_timeout > 0) {
-		if (options.busy_timeout > NumericLimits<int>::Maximum()) {
-			throw std::runtime_error("busy_timeout out of range - must be within valid range for type int");
-		}
-		rc = sqlite3_busy_timeout(result.db, int(options.busy_timeout));
-		if (rc != SQLITE_OK) {
-			throw std::runtime_error("Failed to set busy timeout");
-		}
-	}
-	if (!options.journal_mode.empty()) {
-		result.Execute("PRAGMA journal_mode=" + KeywordHelper::EscapeQuotes(options.journal_mode, '\''));
-	}
-	return result;
-}
 
 SQLiteDB SQLiteDB::OpenFromBuffer(const SQLiteOpenOptions &options, const std::vector<unsigned char> &buffer){
         SQLiteDB result;
@@ -230,17 +197,6 @@ void SQLiteDB::GetMetaTableInfo(const string &table_name, ColumnList &columns) {
 	if (!found) {
 		throw InternalException("GetTableInfo - table \"%s\" not found", table_name);
 	}
-
-	// columns.AddColumn(ColumnDefinition("TableName", LogicalType::VARCHAR));
-	// columns.AddColumn(ColumnDefinition("ColumnName", LogicalType::VARCHAR));
-	// columns.AddColumn(ColumnDefinition("StoragePosition", LogicalType::BIGINT));
-	// columns.AddColumn(ColumnDefinition("Dictionary", LogicalType::VARCHAR));
-	// columns.AddColumn(ColumnDefinition("HIDX", LogicalType::VARCHAR));
-	// columns.AddColumn(ColumnDefinition("IDF", LogicalType::VARCHAR));
-	// columns.AddColumn(ColumnDefinition("Cardinality", LogicalType::BIGINT));
-	// columns.AddColumn(ColumnDefinition("DataType", LogicalType::BIGINT));
-	// columns.AddColumn(ColumnDefinition("BaseId", LogicalType::BIGINT));
-	// columns.AddColumn(ColumnDefinition("Magnitude", LogicalType::DOUBLE));
 
 }
 
