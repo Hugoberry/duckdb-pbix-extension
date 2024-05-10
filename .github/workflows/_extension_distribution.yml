@@ -31,11 +31,6 @@ on:
         required: false
         type: string
         default: ""
-      # Override the default vcpkg commit used by this version of DuckDB
-      vcpkg_commit:
-        required: false
-        type: string
-        default: "a1a1cbc975abf909a6c8985a6a2b8fe20bbd9bd6"
       # Override the default script producing the matrices. Allows specifying custom matrices.
       matrix_parse_script:
         required: false
@@ -107,8 +102,6 @@ jobs:
     strategy:
       matrix: ${{fromJson(needs.generate_matrix.outputs.linux_matrix)}}
     env:
-      VCPKG_TARGET_TRIPLET: ${{ matrix.vcpkg_triplet }}
-      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
       GEN: Ninja
       BUILD_SHELL: ${{ inputs.build_duckdb_shell && '1' || '0' }}
       DUCKDB_PLATFORM: ${{ matrix.duckdb_arch }}
@@ -159,11 +152,6 @@ jobs:
         with:
           aarch64_cross_compile: ${{ matrix.duckdb_arch == 'linux_arm64' && 1 }}
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11.1
-        with:
-          vcpkgGitCommitId: ${{ inputs.vcpkg_commit }}
-
       - name: Build extension
         env:
           GEN: ninja
@@ -192,8 +180,6 @@ jobs:
     strategy:
       matrix: ${{fromJson(needs.generate_matrix.outputs.osx_matrix)}}
     env:
-      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-      VCPKG_TARGET_TRIPLET: ${{ matrix.vcpkg_triplet }}
       OSX_BUILD_ARCH: ${{ matrix.osx_build_arch }}
       GEN: Ninja
       BUILD_SHELL: ${{ inputs.build_duckdb_shell && '1' || '0' }}
@@ -223,11 +209,6 @@ jobs:
           cd duckdb
           git checkout ${{ inputs.duckdb_version }}
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11.1
-        with:
-          vcpkgGitCommitId: ${{ inputs.vcpkg_commit }}
-
       - name: Build extension
         shell: bash
         env:
@@ -256,8 +237,6 @@ jobs:
       matrix: ${{fromJson(needs.generate_matrix.outputs.windows_matrix)}}
     env:
       GEN: Ninja
-      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-      VCPKG_TARGET_TRIPLET: ${{ matrix.vcpkg_triplet }}
       BUILD_SHELL: ${{ inputs.build_duckdb_shell && '1' || '0' }}
       DUCKDB_PLATFORM: ${{ matrix.duckdb_arch }}
       CC: ${{ matrix.duckdb_arch == 'windows_amd64_rtools' && 'gcc' || '' }}
@@ -291,24 +270,8 @@ jobs:
           cd duckdb
           git checkout ${{ inputs.duckdb_version }}
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11.1
-        with:
-          vcpkgGitCommitId: ${{ inputs.vcpkg_commit }}
-
-      - name: Fix for MSVC issue
-        shell: bash
-        env:
-          OVERLAY_TRIPLET_SRC:  ${{ github.workspace }}/vcpkg/triplets/community/x64-windows-static-md.cmake
-          OVERLAY_TRIPLET_DST:  ${{ github.workspace }}/overlay_triplets/x64-windows-static-md.cmake
-        run: |
-          mkdir overlay_triplets
-          cp $OVERLAY_TRIPLET_SRC $OVERLAY_TRIPLET_DST
-          echo "set(VCPKG_PLATFORM_TOOLSET_VERSION "14.38")" >> $OVERLAY_TRIPLET_DST
-
       - name: Build & test extension
         env:
-          VCPKG_OVERLAY_TRIPLETS: "${{ github.workspace }}/overlay_triplets"
           DUCKDB_PLATFORM: ${{ matrix.duckdb_arch }}
         run: |
           make EXT_RELEASE_FLAGS="-DCMAKE_EXE_LINKER_FLAGS='/FORCE:MULTIPLE' -DCMAKE_SHARED_LINKER_FLAGS='/FORCE:MULTIPLE'" test_release
@@ -327,8 +290,6 @@ jobs:
     strategy:
       matrix: ${{fromJson(needs.generate_matrix.outputs.wasm_matrix)}}
     env:
-      VCPKG_TARGET_TRIPLET: ${{ matrix.vcpkg_triplet }}
-      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
       GEN: Ninja
       DUCKDB_PLATFORM: ${{ matrix.duckdb_arch }}
 
@@ -346,11 +307,6 @@ jobs:
       - uses: mymindstorm/setup-emsdk@v13
         with:
           version: 'latest'
-
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11.1
-        with:
-          vcpkgGitCommitId: ${{ inputs.vcpkg_commit }}
 
       - name: Setup Ccache
         uses: hendrikmuhs/ccache-action@main
