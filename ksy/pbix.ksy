@@ -3,6 +3,7 @@ meta:
   title: PowerBI file
   file-extension: pbix
   ks-version: 0.9
+  license: CC0-1.0
   imports:
     - /common/dos_datetime
   endian: le

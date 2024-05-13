@@ -2,6 +2,10 @@ meta:
   id: column_data_dictionary
   file-extension: dictionary
   endian: le
+  license: CC0-1.0
+  title: Column Data Dictionary
+doc-ref:
+ - https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xldm/d6de072d-5234-4099-b090-528322f829dc
 
 seq:
   - id: dictionary_type

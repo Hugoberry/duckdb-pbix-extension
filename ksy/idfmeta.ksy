@@ -2,6 +2,8 @@ meta:
   id: idfmeta_parser
   file-extension: idfmeta
   endian: le
+  license: CC0-1.0
+  title: Column Data Storage Metadata
 seq:
   - id: blocks
     type: block

@@ -1,6 +1,7 @@
 meta:
   id: zip_end_of_file
-  endian: le  # Assuming little-endian, adjust as necessary
+  endian: le
+  license: CC0-1.0
 
 instances:
   end_of_central_dir:

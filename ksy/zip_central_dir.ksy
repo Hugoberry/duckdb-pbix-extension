@@ -4,6 +4,7 @@ meta:
   file-extension: pbix
   endian: le
   bit-endian: le
+  license: CC0-1.0
 seq:
   - id: sections
     type: pk_section

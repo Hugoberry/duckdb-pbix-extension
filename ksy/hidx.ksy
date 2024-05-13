@@ -2,6 +2,8 @@ meta:
   id: column_data_hidx
   file-extension: hidx
   endian: le
+  license: CC0-1.0
+  title: Column Data Hash Index File
 
 seq:
 # Required Elements for All Files That Use Hashing

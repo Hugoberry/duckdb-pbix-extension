@@ -2,6 +2,8 @@ meta:
   id: column_data_idf
   file-extension: idf
   endian: le
+  license: CC0-1.0
+  title: Column Data Storage Format
 
 seq:
   - id: segments

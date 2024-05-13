@@ -2,6 +2,7 @@ meta:
   id: abf_xpress9
   file-extension: idf
   endian: le
+  license: CC0-1.0
 
 seq:
   - id: signature
