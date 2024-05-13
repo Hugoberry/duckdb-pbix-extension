@@ -12,6 +12,21 @@ set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 set(STRING_ENCODING_TYPE "ICONV" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
 add_definitions(-DKS_STR_ENCODING_ICONV)
 
+if(APPLE)
+  # Specify the path for libiconv installed by Homebrew on macOS
+  set(LIBICONV_PATH "/opt/homebrew/opt/libiconv")
+  
+  find_path(ICONV_INCLUDE_DIR NAME iconv.h HINTS ${LIBICONV_PATH}/include)
+  find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv2 HINTS ${LIBICONV_PATH}/lib)
+  
+  if (ICONV_INCLUDE_DIR AND ICONV_LIBRARIES)
+    include_directories(${ICONV_INCLUDE_DIR})
+    link_libraries(${ICONV_LIBRARIES})
+    add_definitions(-DKS_STR_ENCODING_ICONV)
+  else()
+    message(FATAL_ERROR "libiconv not found")
+  endif()
+endif()
 
 project(${TARGET_NAME})
 include_directories(src/include)
@@ -68,11 +83,11 @@ set(EXTENSION_SOURCES
     ${ABF_SOURCES}
     ${VERTIPAQ_SOURCES})
 
-find_package(Iconv REQUIRED)
-if(ICONV_FOUND)
-    include_directories(${ICONV_INCLUDE_DIRS})
-    link_libraries(${ICONV_LIBRARIES})
-endif()
+# find_package(Iconv REQUIRED)
+# if(ICONV_FOUND)
+#     include_directories(${ICONV_INCLUDE_DIRS})
+#     link_libraries(${ICONV_LIBRARIES})
+# endif()
 
 # build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 # build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
