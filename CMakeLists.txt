@@ -9,8 +9,8 @@ set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 
 
-set(STRING_ENCODING_TYPE "NONE" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
-add_definitions(-DKS_STR_ENCODING_NONE)
+set(STRING_ENCODING_TYPE "ICONV" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
+add_definitions(-DKS_STR_ENCODING_ICONV)
 
 
 project(${TARGET_NAME})
