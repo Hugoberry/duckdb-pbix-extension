@@ -194,6 +194,7 @@ jobs:
       - name: Install Ninja
         run: |
           brew install ninja
+          brew install libiconv
 
       - name: Setup Ccache
         uses: hendrikmuhs/ccache-action@main
