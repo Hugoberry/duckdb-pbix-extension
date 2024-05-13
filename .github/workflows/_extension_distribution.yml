@@ -194,7 +194,12 @@ jobs:
       - name: Install Ninja
         run: |
           brew install ninja
-          brew install libiconv
+
+      - name: Configure libiconv environment
+        run: |
+          echo 'export PATH="/opt/homebrew/opt/libiconv/bin:$PATH"' >> $GITHUB_ENV
+          echo 'export LDFLAGS="-L/opt/homebrew/opt/libiconv/lib $LDFLAGS"' >> $GITHUB_ENV
+          echo 'export CPPFLAGS="-I/opt/homebrew/opt/libiconv/include $CPPFLAGS"' >> $GITHUB_ENV
 
       - name: Setup Ccache
         uses: hendrikmuhs/ccache-action@main
