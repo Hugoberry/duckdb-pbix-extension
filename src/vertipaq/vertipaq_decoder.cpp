@@ -44,19 +44,19 @@ namespace duckdb
             
             for(int page_id = 0; page_id < pages->size(); page_id++){
                 const auto& page = pages->at(page_id);
-                if(page->page_compressed()){
-                    auto compressed_store = static_cast<column_data_dictionary_t::compressed_strings_t*>(page->string_store());
-                    auto encode_array = compressed_store->encode_array();
-                    auto store_total_bits = compressed_store->store_total_bits();
-                    auto compressed_string_buffer = compressed_store->compressed_string_buffer();
-                    auto ui_decode_bits = compressed_store->ui_decode_bits();
+                auto it = record_handles_map.find(page_id);
+                if (it != record_handles_map.end()) {
+                    if(page->page_compressed()){
+                        auto compressed_store = static_cast<column_data_dictionary_t::compressed_strings_t*>(page->string_store());
+                        auto encode_array = compressed_store->encode_array();
+                        auto store_total_bits = compressed_store->store_total_bits();
+                        auto compressed_string_buffer = compressed_store->compressed_string_buffer();
+                        auto ui_decode_bits = compressed_store->ui_decode_bits();
 
-                    auto full_encode_array = decompress_encode_array(*encode_array);
+                        auto full_encode_array = decompress_encode_array(*encode_array);
 
-                    HuffmanTree* huffman_tree = build_huffman_tree(full_encode_array);
+                        HuffmanTree* huffman_tree = build_huffman_tree(full_encode_array);
 
-                    auto it = record_handles_map.find(page_id);
-                    if (it != record_handles_map.end()) {
                         for (size_t i = 0; i < it->second.size(); i++) {
                             uint32_t start_bit = it->second[i];
                             uint32_t end_bit = (i + 1 < it->second.size()) ? it->second[i + 1] : store_total_bits; // end of the compressed buffer
@@ -64,17 +64,43 @@ namespace duckdb
 
                             hashtable[index++] = decompressed;
                         }
-                    }
-                    delete huffman_tree;
-                } else {
-                    auto uncompressed_store = static_cast<column_data_dictionary_t::uncompressed_strings_t *>(page->string_store());
-                    auto uncompressed = uncompressed_store->uncompressed_character_buffer();
-                    // Extracting strings from the uncompressed buffer
-                    std::istringstream ss(uncompressed);
-                    std::string token;
-                    while (std::getline(ss, token, '\0'))
-                    { // assuming null-terminated strings in buffer
-                        hashtable[index++] = token;
+                        delete huffman_tree;
+                    } else {
+                        auto uncompressed_store = static_cast<column_data_dictionary_t::uncompressed_strings_t *>(page->string_store());
+                        auto buffer_used_characters = uncompressed_store->buffer_used_characters();
+                        auto uncompressed = uncompressed_store->uncompressed_character_buffer();
+                        std::cout << "Uncompressed buffer size: " << buffer_used_characters << std::endl;
+                        std::cout << "Uncompressed buffer: " << uncompressed << std::endl;
+                        for (size_t i = 0; i < it->second.size(); i++) {
+                            uint32_t start_byte = it->second[i];
+                            uint32_t end_byte = (i + 1 < it->second.size()) ? it->second[i + 1] : buffer_used_characters; // end of the uncompressed buffer
+                            std::string str(uncompressed.begin() + start_byte, uncompressed.begin() + end_byte - 1);
+                            auto ws= uncompressed.substr(start_byte, end_byte - start_byte+1 );
+                            std::cout << ws << "|"<< start_byte << "|" << end_byte << "][";
+                            hashtable[index++] = str;
+                        }
+                        std::cout << std::endl;
+                        // Extracting strings from the uncompressed buffer
+                        // auto char_buffer = reinterpret_cast<const char *>(uncompressed);
+                        // while (*char_buffer != '\0')
+                        // {
+                        //     std::string str(char_buffer);
+                        //     hashtable[index++] = str;
+                        //     char_buffer += str.size() + 1;
+                        // }
+                        // auto wchar_buffer = reinterpret_cast<const wchar_t*>(uncompressed);
+                        // while(*wchar_buffer != L'\0'){
+                        //     std::wstring ws(wchar_buffer);
+                        //     std::string str(ws.begin(), ws.end());
+                        //     hashtable[index++] = str;
+                        //     wchar_buffer += str.size() + 1;
+                        // }
+                        // std::istringstream ss(uncompressed);
+                        // std::string token;
+                        // while (std::getline(ss, token, L'\0'))
+                        // { // assuming null-terminated strings in buffer
+                        //     hashtable[index++] = token;
+                        // }
                     }
                 }
 

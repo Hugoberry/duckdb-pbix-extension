@@ -68,11 +68,6 @@ set(EXTENSION_SOURCES
     ${ABF_SOURCES}
     ${VERTIPAQ_SOURCES})
 
-find_package(Iconv REQUIRED)
-if(ICONV_FOUND)
-    include_directories(${ICONV_INCLUDE_DIRS})
-    link_libraries(${ICONV_LIBRARIES})
-endif()
 
 # build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 # build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
