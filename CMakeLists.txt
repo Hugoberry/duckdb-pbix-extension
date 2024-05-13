@@ -8,24 +8,28 @@ set(TARGET_NAME pbix)
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 
+# Conditional string encoding setup
+if(WIN32)
+    # Windows-specific string encoding configuration
+    set(STRING_ENCODING_TYPE "WIN32API" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
+    add_definitions(-DKS_STR_ENCODING_WIN32API)
+elseif(APPLE)
+    # macOS-specific string encoding configuration using libiconv
+    set(LIBICONV_PATH "/opt/homebrew/opt/libiconv")
+    find_path(ICONV_INCLUDE_DIR NAME iconv.h HINTS ${LIBICONV_PATH}/include)
+    find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv2 HINTS ${LIBICONV_PATH}/lib)
 
-set(STRING_ENCODING_TYPE "ICONV" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
-add_definitions(-DKS_STR_ENCODING_ICONV)
-
-if(APPLE)
-  # Specify the path for libiconv installed by Homebrew on macOS
-  set(LIBICONV_PATH "/opt/homebrew/opt/libiconv")
-  
-  find_path(ICONV_INCLUDE_DIR NAME iconv.h HINTS ${LIBICONV_PATH}/include)
-  find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv2 HINTS ${LIBICONV_PATH}/lib)
-  
-  if (ICONV_INCLUDE_DIR AND ICONV_LIBRARIES)
-    include_directories(${ICONV_INCLUDE_DIR})
-    link_libraries(${ICONV_LIBRARIES})
+    if (ICONV_INCLUDE_DIR AND ICONV_LIBRARIES)
+        include_directories(${ICONV_INCLUDE_DIR})
+        link_libraries(${ICONV_LIBRARIES})
+        add_definitions(-DKS_STR_ENCODING_ICONV)
+    else()
+        message(FATAL_ERROR "libiconv not found on macOS")
+    endif()
+else()
+    # Default case for other Unix-like systems
+    set(STRING_ENCODING_TYPE "ICONV" CACHE STRING "Set the way strings have to be encoded (ICONV|WIN32API|NONE|...)")
     add_definitions(-DKS_STR_ENCODING_ICONV)
-  else()
-    message(FATAL_ERROR "libiconv not found")
-  endif()
 endif()
 
 project(${TARGET_NAME})
