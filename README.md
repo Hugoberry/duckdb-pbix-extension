@@ -72,7 +72,7 @@ make test
 ```
 
 ### Installing the deployed binaries
-To install your extension binaries from S3, you will need to do two things. Firstly, DuckDB should be launched with the
+You will need to do two things to install your extension binaries from S3. Firstly, DuckDB should be launched with the
 `allow_unsigned_extensions` option set to true. How to set this will depend on the client you're using. Some examples:
 
 CLI:
@@ -90,8 +90,8 @@ NodeJS:
 db = new duckdb.Database(':memory:', {"allow_unsigned_extensions": "true"});
 ```
 
-Secondly, you will need to set the repository endpoint in DuckDB to the HTTP url of your bucket + version of the extension
-you want to install. To do this run the following SQL query in DuckDB:
+Secondly, you must set the repository endpoint in DuckDB to the HTTP URL of your bucket + version of the extension
+you want to install. To do this, run the following SQL query in DuckDB:
 ```sql
 SET custom_extension_repository='https://duckdb.pbix.info';
 ```
@@ -100,3 +100,8 @@ After running these steps, you can install and load your extension using the reg
 INSTALL pbix
 LOAD pbix
 ```
+## Limitations/Bugs/Features/TODO
+* The WASM version can't parse `https` hosted files
+* pbix_read() doesn't let you select only specific columns; you need to CTE to pick the output columns
+* pbix_read() currently limited to 2048 records
+* pbix_read() will decompress the entire model in memory
