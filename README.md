@@ -48,8 +48,13 @@ D SELECT Name FROM pbix_meta('Adventure Works DW 2020.pbix','table') where isHid
 ```
 ### pbix_read()
 Returns the contents of table from pbix file.
-```
-D SELECT ResellerKey, 'Business Type', Reseller, 'Reseller ID' FROM pbix_read('Adventure Works DW 2020.pbix','Reseller') limit 10; 
+```sql
+D SELECT 
+  ResellerKey, 
+  'Business Type', 
+  Reseller, 
+  'Reseller ID' 
+  FROM pbix_read('Adventure Works DW 2020.pbix','Reseller') limit 10; 
 ┌─────────────┬──────────────────────┬─────────────────────────────────┬─────────────┐
 │ ResellerKey ┆ 'Business Type'      ┆ Reseller                        ┆'Reseller ID'│
 ╞═════════════╪══════════════════════╪═════════════════════════════════╪═════════════╡
