@@ -49,21 +49,21 @@ D SELECT Name FROM pbix_meta('Adventure Works DW 2020.pbix','table') where isHid
 ### pbix_read()
 Returns the contents of table from pbix file.
 ```
-D FROM pbix_read('Adventure Works DW 2020.pbix','Reseller') limit 10; 
-┌─────────────┬──────────────────────┬─────────────────────────────────┬──────────────┬────────────────┬────────────────┬─────────────┬─────────────┐
-│ ResellerKey ┆ Business Type        ┆ Reseller                        ┆ City         ┆ State-Province ┆ Country-Region ┆ Postal Code ┆ Reseller ID │
-╞═════════════╪══════════════════════╪═════════════════════════════════╪══════════════╪════════════════╪════════════════╪═════════════╪═════════════╡
-│         277 ┆ Specialty Bike Shop  ┆ The Bicycle Accessories Company ┆ Alhambra     ┆ California     ┆ United States  ┆ 91801       ┆ AW00000277  │
-│         455 ┆ Value Added Reseller ┆ Timely Shipping Service         ┆ Alpine       ┆ California     ┆ United States  ┆ 91901       ┆ AW00000455  │
-│         609 ┆ Value Added Reseller ┆ Good Toys                       ┆ Auburn       ┆ California     ┆ United States  ┆ 95603       ┆ AW00000609  │
-│         492 ┆ Specialty Bike Shop  ┆ Basic Sports Equipment          ┆ Baldwin Park ┆ California     ┆ United States  ┆ 91706       ┆ AW00000492  │
-│         365 ┆ Specialty Bike Shop  ┆ Distinctive Store               ┆ Barstow      ┆ California     ┆ United States  ┆ 92311       ┆ AW00000365  │
-│         168 ┆ Specialty Bike Shop  ┆ Economy Bikes Company           ┆ Bell Gardens ┆ California     ┆ United States  ┆ 90201       ┆ AW00000168  │
-│           6 ┆ Warehouse            ┆ Aerobic Exercise Company        ┆ Camarillo    ┆ California     ┆ United States  ┆ 93010       ┆ AW00000006  │
-│         402 ┆ Warehouse            ┆ Pro Sporting Goods              ┆ Camarillo    ┆ California     ┆ United States  ┆ 93010       ┆ AW00000402  │
-│         529 ┆ Warehouse            ┆ Big-Time Bike Store             ┆ Camarillo    ┆ California     ┆ United States  ┆ 93010       ┆ AW00000529  │
-│         241 ┆ Specialty Bike Shop  ┆ Vale Riding Supplies            ┆ Canoga Park  ┆ California     ┆ United States  ┆ 91303       ┆ AW00000241  │
-└─────────────┴──────────────────────┴─────────────────────────────────┴──────────────┴────────────────┴────────────────┴─────────────┴─────────────┘
+D SELECT ResellerKey, 'Business Type', Reseller, 'Reseller ID' FROM pbix_read('Adventure Works DW 2020.pbix','Reseller') limit 10; 
+┌─────────────┬──────────────────────┬─────────────────────────────────┬─────────────┐
+│ ResellerKey ┆ 'Business Type'      ┆ Reseller                        ┆'Reseller ID'│
+╞═════════════╪══════════════════════╪═════════════════════════════════╪═════════════╡
+│         277 ┆ Specialty Bike Shop  ┆ The Bicycle Accessories Company ┆ AW00000277  │
+│         455 ┆ Value Added Reseller ┆ Timely Shipping Service         ┆ AW00000455  │
+│         609 ┆ Value Added Reseller ┆ Good Toys                       ┆ AW00000609  │
+│         492 ┆ Specialty Bike Shop  ┆ Basic Sports Equipment          ┆ AW00000492  │
+│         365 ┆ Specialty Bike Shop  ┆ Distinctive Store               ┆ AW00000365  │
+│         168 ┆ Specialty Bike Shop  ┆ Economy Bikes Company           ┆ AW00000168  │
+│           6 ┆ Warehouse            ┆ Aerobic Exercise Company        ┆ AW00000006  │
+│         402 ┆ Warehouse            ┆ Pro Sporting Goods              ┆ AW00000402  │
+│         529 ┆ Warehouse            ┆ Big-Time Bike Store             ┆ AW00000529  │
+│         241 ┆ Specialty Bike Shop  ┆ Vale Riding Supplies            ┆ AW00000241  │
+└─────────────┴──────────────────────┴─────────────────────────────────┴─────────────┘
 ```
 ## Running the tests
 Different tests can be created for DuckDB extensions. The primary way of testing DuckDB extensions should be the SQL tests in `./test/sql`. These SQL tests can be run using:
