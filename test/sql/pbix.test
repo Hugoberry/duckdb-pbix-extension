@@ -18,3 +18,9 @@ SELECT Name FROM pbix_meta('data/sales.pbix','table') WHERE isHidden=0 ORDER BY 
 Geo
 Online Sales
 
+# Project a single column from a table
+query I
+SELECT Reseller FROM pbix_read('data/work.pbix','Reseller') ORDER BY Reseller LIMIT 2;
+----
+A Bicycle Association
+A Bike Store

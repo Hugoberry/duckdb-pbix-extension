@@ -140,8 +140,25 @@ namespace duckdb
 			{ return column_id == (column_t)-1 ? "ROWID"
 											   : '"' + SQLiteUtils::SanitizeIdentifier(bind_data.names[column_id]) + '"'; });
 
-		auto sql =
-			StringUtil::Format("SELECT c.ExplicitName,cs.StoragePosition,sfd.FileName,sfi.FileName,c.ExplicitDataType,ds.BaseId, ds.Magnitude, ds.IsNullable FROM COLUMN c JOIN [Table] t ON c.TableId = t.ID JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID LEFT JOIN DictionaryStorage ds ON ds.ID = cs.DictionaryStorageID LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID WHERE c.Type = 1 AND t.Name='%s'", SQLiteUtils::SanitizeIdentifier(bind_data.table_name));
+		auto sql = StringUtil::Format(R"(
+				SELECT 
+					c.ExplicitName, 
+					cs.StoragePosition, 
+					sfd.FileName, 
+					sfi.FileName, 
+					c.ExplicitDataType, 
+					ds.BaseId, 
+					ds.Magnitude, 
+					ds.IsNullable
+				FROM COLUMN c
+				JOIN [Table] t ON c.TableId = t.ID
+				JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
+				LEFT JOIN DictionaryStorage ds ON ds.ID = cs.DictionaryStorageID
+				LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
+				JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
+				JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
+				WHERE c.Type = 1 AND t.Name='%s' AND c.ExplicitName IN (%s)
+			)", SQLiteUtils::SanitizeIdentifier(bind_data.table_name), col_names.c_str());
 		if (bind_data.rows_per_group != idx_t(-1))
 		{
 			// we are scanning a subset of the rows - generate a WHERE clause based on

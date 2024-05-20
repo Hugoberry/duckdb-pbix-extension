@@ -102,6 +102,6 @@ LOAD pbix
 ```
 ## Limitations/Bugs/Features/TODO
 * The WASM version can't parse `https` hosted files
-* pbix_read() doesn't let you select only specific columns; you need to CTE to pick the output columns
+* ~~pbix_read() doesn't let you select only specific columns; you need to CTE to pick the output columns~~
 * pbix_read() currently limited to 2048 records
 * pbix_read() will decompress the entire model in memory
