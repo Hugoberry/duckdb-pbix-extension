@@ -6,6 +6,7 @@ This repository is based on https://github.com/duckdb/extension-template, check 
 
 This duckdb extension, pbix, allows you to parse the data model embedded in PowerBI (pbix) files.
 
+For a pure Python implementation of the pbix parser, check out this library 👉 [PBIXray](https://github.com/Hugoberry/pbixray).
 
 ## Building
 ### Build steps
