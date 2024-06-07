@@ -18,7 +18,7 @@ jobs:
     name: Build extension binaries
     uses: ./.github/workflows/_extension_distribution.yml
     with:
-      duckdb_version: v0.10.1
+      duckdb_version: v1.0.0
       extension_name: pbix
 
   duckdb-stable-deploy:
@@ -27,7 +27,7 @@ jobs:
     uses: ./.github/workflows/_extension_deploy.yml
     secrets: inherit
     with:
-      duckdb_version: v0.10.1
+      duckdb_version: v1.0.0
       extension_name: pbix
       deploy_latest: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
       deploy_versioned: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
