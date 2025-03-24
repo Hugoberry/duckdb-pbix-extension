@@ -242,77 +242,86 @@ namespace duckdb
         }
     }
 
-    void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::DataChunk &output, idx_t &out_idx, idx_t col_idx) {
-        // Common processing
+    void VertipaqDecoder::initializeColumnData(VertipaqDetails &details, VertipaqFiles &vfiles) {
+        if (details.is_initialized) {
+            return; // Already initialized
+        }
+        
+        // Read metadata
         std::string idf_metadata = details.IDF + "meta";
         auto &meta_file = vfiles[idf_metadata];
         std::string idf_meta_stream(all_decompressed_data.begin() + meta_file.m_cbOffsetHeader, 
                                     all_decompressed_data.begin() + meta_file.m_cbOffsetHeader + meta_file.Size);
         IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
-
+    
         // Read IDF with error correction
         int correction = error_code ? 4 : 0;
         auto &idf_file = vfiles[details.IDF];
         std::string idf_stream(all_decompressed_data.begin() + idf_file.m_cbOffsetHeader, 
                             all_decompressed_data.begin() + idf_file.m_cbOffsetHeader + idf_file.Size - correction);
-
+    
         //if isNullable treat min_data_id as blank
         int null_adjustment = details.IsNullable && details.DataType==2 ? 1 : 0;
+    
+        // Cache decoded indices
+        details.decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
+    
+        // Cache dictionary if needed
+        if (details.Dictionary != "") {
+            std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, 
+                                         all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
+            details.dictionary_cache = readDictionary(dictionary_stream, idf_m.min_data_id);
+        }
+    
+        details.is_initialized = true;
+    }
+    
+void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, 
+                                         DataChunk &output, idx_t start_row, idx_t row_count, idx_t col_idx) {
+    // Initialize data if needed
+    if (!details.is_initialized) {
+        initializeColumnData(details, vfiles);
+    }
 
-        auto decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
-
-        if (details.Dictionary != "")
-        {
-            // read dictionary file
-            std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
-            auto dictionary = readDictionary(dictionary_stream, idf_m.min_data_id);
-
-            if (details.DataType == 10) // FLOAT or DOUBLE
-            {
-                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
-                {
-                    auto val = dictionary[decoded_indices[i]];
-                    output.SetValue(col_idx, i, duckdb::Value(std::stoi(val) / 10000.0000));
-                    out_idx++;
-                }
+    // Ensure we don't read beyond available data
+    row_count = MinValue<idx_t>(row_count, details.decoded_indices.size() - start_row);
+    
+    if (details.Dictionary != "") {
+        if (details.DataType == 10) { // FLOAT or DOUBLE
+            for (idx_t i = 0; i < row_count; i++) {
+                auto index = details.decoded_indices[start_row + i];
+                auto val = details.dictionary_cache[index];
+                output.SetValue(col_idx, i, Value(std::stoi(val) / 10000.0000));
             }
-            else if (details.DataType == 9) // DATE
-            {
-                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
-                {
-                    auto val = dictionary[decoded_indices[i]];
-                    auto dd = date_t(0) + static_cast<int>(std::stod(val)) - EPOCH_ADJUSTMENT - idf_m.min_data_id; // days between (1900 - 1970)
-                    output.SetValue(col_idx, i, duckdb::Value::DATE(dd));
-                    out_idx++;
-                }
-            }
-            else
-            {
-                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
-                {
-                    auto val = dictionary[decoded_indices[i]];
-                    output.SetValue(col_idx, i, val);
-                    out_idx++;
-                }
+        } else if (details.DataType == 9) { // DATE
+            for (idx_t i = 0; i < row_count; i++) {
+                auto index = details.decoded_indices[start_row + i];
+                auto val = details.dictionary_cache[index];
+                auto dd = date_t(0) + static_cast<int>(std::stod(val)) - 25569; // EPOCH_ADJUSTMENT
+                output.SetValue(col_idx, i, Value::DATE(dd));
             }
         } else {
-            if(details.DataType == 10) //DOUBLE or FLOAT
-            {
-                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
-                {
-                    auto val = (decoded_indices[i] + details.BaseId) / details.Magnitude / 10000.0000;
-                    output.SetValue(col_idx, i, val);
-                    out_idx++;
-                }
-            } else {
-                for (idx_t i = 0; i < std::min<int>(decoded_indices.size(), STANDARD_VECTOR_SIZE); i++)
-                {
-                    auto val = (decoded_indices[i] + details.BaseId) / details.Magnitude;
-                    output.SetValue(col_idx, i, duckdb::Value::BIGINT(val));
-                    out_idx++;
-                }
+            for (idx_t i = 0; i < row_count; i++) {
+                auto index = details.decoded_indices[start_row + i];
+                auto val = details.dictionary_cache[index];
+                output.SetValue(col_idx, i, val);
+            }
+        }
+    } else {
+        if (details.DataType == 10) { //DOUBLE or FLOAT
+            for (idx_t i = 0; i < row_count; i++) {
+                auto index = details.decoded_indices[start_row + i];
+                auto val = (index + details.BaseId) / details.Magnitude / 10000.0000;
+                output.SetValue(col_idx, i, val);
+            }
+        } else {
+            for (idx_t i = 0; i < row_count; i++) {
+                auto index = details.decoded_indices[start_row + i];
+                auto val = (index + details.BaseId) / details.Magnitude;
+                output.SetValue(col_idx, i, Value::BIGINT(val));
             }
         }
     }
+}
 
 } // namespace duckdb

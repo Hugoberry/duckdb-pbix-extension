@@ -32,6 +32,7 @@ namespace duckdb
         std::vector<uint64_t> readRLEBitPackedHybrid(std::string &str, uint64_t entries, uint64_t min_data_id, uint64_t bit_width);
         std::map<uint64_t, std::string> readDictionary(std::string &dictionary_stream, uint64_t min_data_id);
         IdfMetadata readIdfMetadata(std::string &stream);
-        void processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::DataChunk &output, idx_t &out_idx, idx_t col_idx);
+        void initializeColumnData(VertipaqDetails &details, VertipaqFiles &vfiles);
+        void processVertipaqData(VertipaqDetails &details, VertipaqFiles &vfiles, duckdb::DataChunk &output, idx_t start_row, idx_t row_count, idx_t col_idx);
     };
 } // namespace duckdb

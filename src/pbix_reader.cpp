@@ -31,11 +31,18 @@ struct PbixLocalState : public LocalTableFunctionState {
 	vector<column_t> column_ids;
 	//! The amount of rows we scanned as part of this row group
 	idx_t scan_count = 1;
+	//! Track column data between chunks
+	std::vector<VertipaqDetails> column_details;
+	//! Keep track of total available rows
+	idx_t total_rows = 0;
+	//! Current position in the result set
+	idx_t current_row = 0;
+	//! Need to initialize vertipaq decoder and data
+	bool initialized_vertipaq = false;
 
 	~PbixLocalState() {
 	}
 };
-
 struct PbixGlobalState : public GlobalTableFunctionState {
 	explicit PbixGlobalState(idx_t max_threads) : max_threads(max_threads) {
 	}
@@ -102,62 +109,66 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 }
 
 static void PbixInitInternal(ClientContext &context, const PbixBindData &bind_data, PbixLocalState &local_state,
-								 idx_t rowid_min, idx_t rowid_max) {
-	D_ASSERT(rowid_min <= rowid_max);
+                            idx_t rowid_min, idx_t rowid_max) {
+    D_ASSERT(rowid_min <= rowid_max);
 
-	local_state.done = false;
-	// we may have leftover statements or connections from a previous call to this function
-	local_state.stmt.Close();
-	if (!local_state.db) {
-		SQLiteOpenOptions options;
-		options.access_mode = AccessMode::READ_ONLY;
-		int trailing_chunks = bind_data.trailing_chunks;
-		Value pbix_magic_number;
+    local_state.done = false;
+    local_state.initialized_vertipaq = false;
+    local_state.current_row = 0;
+    local_state.total_rows = 0;
+    
+    // we may have leftover statements or connections from a previous call to this function
+    local_state.stmt.Close();
+    if (!local_state.db) {
+        SQLiteOpenOptions options;
+        options.access_mode = AccessMode::READ_ONLY;
+        int trailing_chunks = bind_data.trailing_chunks;
+        Value pbix_magic_number;
 
-		if (context.TryGetCurrentSetting("pbix_magic_number", pbix_magic_number)) {
-			trailing_chunks = IntegerValue::Get(pbix_magic_number);
-		}
+        if (context.TryGetCurrentSetting("pbix_magic_number", pbix_magic_number)) {
+            trailing_chunks = IntegerValue::Get(pbix_magic_number);
+        }
 
-		std::vector<VertipaqFile> vertipaq_files;
-		bool error_code;
-		ExtractDB(context, bind_data.file_name.c_str(), trailing_chunks, local_state.owned_db, vertipaq_files, error_code);
-		local_state.db = &local_state.owned_db;
-	}
+        std::vector<VertipaqFile> vertipaq_files;
+        bool error_code;
+        ExtractDB(context, bind_data.file_name.c_str(), trailing_chunks, local_state.owned_db, vertipaq_files, error_code);
+        local_state.db = &local_state.owned_db;
+    }
 
-	auto col_names = StringUtil::Join(
-		local_state.column_ids.data(), local_state.column_ids.size(), ", ", [&](const idx_t column_id) { 
-			return column_id == (column_t)-1 ? "ROWID" : '"' + SQLiteUtils::SanitizeIdentifier(bind_data.names[column_id]) + '"'; 
-		});
+    auto col_names = StringUtil::Join(
+        local_state.column_ids.data(), local_state.column_ids.size(), ", ", [&](const idx_t column_id) { 
+            return column_id == (column_t)-1 ? "ROWID" : '"' + SQLiteUtils::SanitizeIdentifier(bind_data.names[column_id]) + '"'; 
+        });
 
-	auto sql = StringUtil::Format(R"(
-			SELECT 
-				c.ExplicitName, 
-				cs.StoragePosition, 
-				sfd.FileName, 
-				sfi.FileName, 
-				c.ExplicitDataType, 
-				ds.BaseId, 
-				ds.Magnitude, 
-				ds.IsNullable
-			FROM COLUMN c
-			JOIN [Table] t ON c.TableId = t.ID
-			JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
-			LEFT JOIN DictionaryStorage ds ON ds.ID = cs.DictionaryStorageID
-			LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
-			JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
-			JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
-			WHERE c.Type = 1 AND t.Name='%s' AND c.ExplicitName IN (%s)
-		)", SQLiteUtils::SanitizeIdentifier(bind_data.table_name), col_names.c_str());
+    auto sql = StringUtil::Format(R"(
+            SELECT 
+                c.ExplicitName, 
+                cs.StoragePosition, 
+                sfd.FileName, 
+                sfi.FileName, 
+                c.ExplicitDataType, 
+                ds.BaseId, 
+                ds.Magnitude, 
+                ds.IsNullable
+            FROM COLUMN c
+            JOIN [Table] t ON c.TableId = t.ID
+            JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
+            LEFT JOIN DictionaryStorage ds ON ds.ID = cs.DictionaryStorageID
+            LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
+            JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
+            JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
+            WHERE c.Type = 1 AND t.Name='%s' AND c.ExplicitName IN (%s)
+        )", SQLiteUtils::SanitizeIdentifier(bind_data.table_name), col_names.c_str());
 
-	if (bind_data.rows_per_group.IsValid()) {
-		// we are scanning a subset of the rows - generate a WHERE clause based on the rowid
-		auto where_clause = StringUtil::Format(" AND ROWID BETWEEN %d AND %d", rowid_min, rowid_max);
-		sql += where_clause;
-	} else {
-		// we are scanning the entire table - no need for a WHERE clause
-		D_ASSERT(rowid_min == 0);
-	}
-	local_state.stmt = local_state.db->Prepare(sql.c_str());
+    if (bind_data.rows_per_group.IsValid()) {
+        // we are scanning a subset of the rows - generate a WHERE clause based on the rowid
+        auto where_clause = StringUtil::Format(" AND ROWID BETWEEN %d AND %d", rowid_min, rowid_max);
+        sql += where_clause;
+    } else {
+        // we are scanning the entire table - no need for a WHERE clause
+        D_ASSERT(rowid_min == 0);
+    }
+    local_state.stmt = local_state.db->Prepare(sql.c_str());
 }
 
 static unique_ptr<NodeStatistics> PbixCardinality(ClientContext &context, const FunctionData *bind_data_p) {
@@ -218,84 +229,116 @@ static bool PbixParallelStateNext(ClientContext &context, const PbixBindData &bi
 
 static unique_ptr<LocalTableFunctionState>
 PbixInitLocalState(ExecutionContext &context, TableFunctionInitInput &input, GlobalTableFunctionState *global_state) {
-	auto &bind_data = input.bind_data->Cast<PbixBindData>();
-	auto &gstate = global_state->Cast<PbixGlobalState>();
-	auto result = make_uniq<PbixLocalState>();
-	result->column_ids = input.column_ids;
-	result->db = bind_data.global_db;
-	if (!PbixParallelStateNext(context.client, bind_data, *result, gstate)) {
-		result->done = true;
-	}
-	return std::move(result);
+    auto &bind_data = input.bind_data->Cast<PbixBindData>();
+    auto &gstate = global_state->Cast<PbixGlobalState>();
+    auto result = make_uniq<PbixLocalState>();
+    result->column_ids = input.column_ids;
+    result->db = bind_data.global_db;
+    result->initialized_vertipaq = false;
+    result->current_row = 0;
+    result->total_rows = 0;
+    
+    if (!PbixParallelStateNext(context.client, bind_data, *result, gstate)) {
+        result->done = true;
+    }
+    
+    return std::move(result);
 }
 
 static unique_ptr<GlobalTableFunctionState> PbixInitGlobalState(ClientContext &context,
-																TableFunctionInitInput &input) {
-	auto &bind_data = input.bind_data->Cast<PbixBindData>();
-	auto result = make_uniq<PbixGlobalState>(PbixMaxThreads(context, input.bind_data.get()));
-	result->position = 0;
-	if (bind_data.rows_per_group.IsValid()) {
-		auto min_row_id = bind_data.row_id_info.min_rowid.GetIndex();
-		if (min_row_id > 0) {
-			result->position = min_row_id - 1;
-		}
-		result->rows_per_group = bind_data.rows_per_group.GetIndex();
-	}
-	return std::move(result);
+                                                              TableFunctionInitInput &input) {
+    auto &bind_data = input.bind_data->Cast<PbixBindData>();
+    auto result = make_uniq<PbixGlobalState>(PbixMaxThreads(context, input.bind_data.get()));
+    result->position = 0;
+    if (bind_data.rows_per_group.IsValid()) {
+        auto min_row_id = bind_data.row_id_info.min_rowid.GetIndex();
+        if (min_row_id > 0) {
+            result->position = min_row_id - 1;
+        }
+        result->rows_per_group = bind_data.rows_per_group.GetIndex();
+    }
+    return std::move(result);
 }
 
 static void PbixRead(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
-	auto &state = data.local_state->Cast<PbixLocalState>();
-	auto &gstate = data.global_state->Cast<PbixGlobalState>();
-	auto &bind_data = data.bind_data->Cast<PbixBindData>();
+    auto &state = data.local_state->Cast<PbixLocalState>();
+    auto &bind_data = data.bind_data->Cast<PbixBindData>();
 
-	VertipaqDecoder vdecoder(context, bind_data.file_name, bind_data.data_model_error);
-	VertipaqData columnData;
-	VertipaqFiles vertipaq_files;
-	// put the vector from bind_data into the vertipaq_files map
-	for (auto &vfile : bind_data.vertipaq_files) {
-		vertipaq_files[vfile.FileName] = vfile;
-	}
+    if (state.done) {
+        return;
+    }
 
-	idx_t out_idx = 0;
-	idx_t col_idx = 0;
-	while (true) {
-		if (state.done) return;
-		auto cardinality = out_idx / output.ColumnCount();
+    // Initialize vertipaq decoder if needed
+    VertipaqDecoder vdecoder(context, bind_data.file_name, bind_data.data_model_error);
+    VertipaqFiles vertipaq_files;
+    
+    // Put the vector from bind_data into the vertipaq_files map
+    for (auto &vfile : bind_data.vertipaq_files) {
+        vertipaq_files[vfile.FileName] = vfile;
+    }
 
-		if (cardinality >= STANDARD_VECTOR_SIZE) {
-			output.SetCardinality(STANDARD_VECTOR_SIZE);
-			return; // Manage chunking by limiting to the standard size
-		}
-		
-		auto &stmt = state.stmt;
-		auto has_more = stmt.Step();
-
-		if (!has_more) {
-			state.done = true;
-			output.SetCardinality(cardinality);
-			break; // Finished processing all rows
-		}
-
-		state.scan_count++; // Track rows scanned for improved parallelization
-
-		// Handle NULL values by checking before constructing std::string
-		const char *dictionary = reinterpret_cast<const char *>(sqlite3_value_text(stmt.GetValue<sqlite3_value *>(2)));
-		const char *idf = reinterpret_cast<const char *>(sqlite3_value_text(stmt.GetValue<sqlite3_value *>(3)));
-
-		VertipaqDetails details = {
-			sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(1)),
-			dictionary ? std::string(dictionary) : "", // Use empty string if NULL
-			idf ? std::string(idf) : "",               // Use empty string if NULL
-			sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(4)),
-			sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(5)),
-			sqlite3_value_double(stmt.GetValue<sqlite3_value *>(6)),
-			sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(7))
-		};
-	
-		vdecoder.processVertipaqData(details, vertipaq_files, output, out_idx, col_idx);
-		col_idx++;
-	}
+    // If we haven't initialized column data yet
+    if (!state.initialized_vertipaq) {
+        auto &stmt = state.stmt;
+        state.column_details.clear();
+        
+        // Fetch all column details from the database
+        while (stmt.Step()) {
+            const char *dictionary = reinterpret_cast<const char *>(sqlite3_value_text(stmt.GetValue<sqlite3_value *>(2)));
+            const char *idf = reinterpret_cast<const char *>(sqlite3_value_text(stmt.GetValue<sqlite3_value *>(3)));
+            
+            VertipaqDetails details;
+            details.StoragePosition = sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(1));
+            details.Dictionary = dictionary ? std::string(dictionary) : "";
+            details.IDF = idf ? std::string(idf) : "";
+            details.DataType = sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(4));
+            details.BaseId = sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(5));
+            details.Magnitude = sqlite3_value_double(stmt.GetValue<sqlite3_value *>(6));
+            details.IsNullable = sqlite3_value_int64(stmt.GetValue<sqlite3_value *>(7));
+            details.current_position = 0;
+            details.is_initialized = false;
+            
+            // Initialize the column data right away
+            vdecoder.initializeColumnData(details, vertipaq_files);
+            
+            // Store column details
+            state.column_details.push_back(details);
+            
+            // Track total rows based on first column
+            if (state.column_details.size() == 1) {
+                state.total_rows = details.decoded_indices.size();
+            }
+        }
+        
+        // Mark vertipaq as initialized
+        state.initialized_vertipaq = true;
+        // Reset database cursor for next scan batch
+        state.stmt.Close();
+    }
+    
+    // Check if we're done
+    if (state.current_row >= state.total_rows) {
+        state.done = true;
+        return;
+    }
+    
+    // Calculate how many rows to process in this chunk
+    idx_t rows_to_process = MinValue<idx_t>((idx_t)STANDARD_VECTOR_SIZE, state.total_rows - state.current_row);
+    
+    // Process each column
+    for (idx_t col_idx = 0; col_idx < output.ColumnCount(); col_idx++) {
+        // Only process if we have column details available
+        if (col_idx < state.column_details.size()) {
+            vdecoder.processVertipaqData(state.column_details[col_idx], vertipaq_files, 
+                                        output, state.current_row, rows_to_process, col_idx);
+        }
+    }
+    
+    // Update current position
+    state.current_row += rows_to_process;
+    
+    // Set the cardinality of the output chunk
+    output.SetCardinality(rows_to_process);
 }
 
 static InsertionOrderPreservingMap<string> PbixToString(TableFunctionToStringInput &input) {

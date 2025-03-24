@@ -11,8 +11,7 @@ struct VertipaqFile
 };
 
 
-struct VertipaqDetails
-{
+struct VertipaqDetails {
 	int64_t StoragePosition;
 	std::string Dictionary;
 	std::string IDF;
@@ -20,8 +19,13 @@ struct VertipaqDetails
 	int64_t BaseId;
 	double Magnitude;
 	int64_t IsNullable;
+	// Add tracking for current position in data
+	idx_t current_position = 0;
+	// Cache decoded data
+	std::vector<uint64_t> decoded_indices;
+	std::map<uint64_t, std::string> dictionary_cache;
+	bool is_initialized = false;
 };
-
 struct IdfMetadata
 {
 	uint32_t min_data_id;
