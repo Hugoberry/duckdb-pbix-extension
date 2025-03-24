@@ -307,13 +307,14 @@ void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFile
                 
                 if (val.empty()) {
                     // Handle empty string as NULL for integer types
-                    output.SetValue(col_idx, i, Value());
+                    output.SetValue(col_idx, i, Value(nullptr));
                 } else {
                     try {
-                        output.SetValue(col_idx, i, Value::BIGINT(std::stoll(val)));
+                        output.SetValue(col_idx, i, val);
                     } catch (const std::exception &e) {
                         // If conversion fails, set to NULL
-                        output.SetValue(col_idx, i, Value());
+                        output.SetValue(col_idx, i, Value(nullptr));
+
                     }
                 }
             }
