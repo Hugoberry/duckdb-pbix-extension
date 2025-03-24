@@ -42,9 +42,4 @@ public:
     PbixScanFunction();
 };
 
-class PbixAttachFunction : public TableFunction {
-public:
-    PbixAttachFunction();
-};
-
 } // namespace duckdb
