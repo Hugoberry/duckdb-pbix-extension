@@ -304,7 +304,18 @@ void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFile
             for (idx_t i = 0; i < row_count; i++) {
                 auto index = details.decoded_indices[start_row + i];
                 auto val = details.dictionary_cache[index];
-                output.SetValue(col_idx, i, val);
+                
+                if (val.empty()) {
+                    // Handle empty string as NULL for integer types
+                    output.SetValue(col_idx, i, Value());
+                } else {
+                    try {
+                        output.SetValue(col_idx, i, Value::BIGINT(std::stoll(val)));
+                    } catch (const std::exception &e) {
+                        // If conversion fails, set to NULL
+                        output.SetValue(col_idx, i, Value());
+                    }
+                }
             }
         }
     } else {
