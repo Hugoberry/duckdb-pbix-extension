@@ -253,6 +253,7 @@ namespace duckdb
         std::string idf_meta_stream(all_decompressed_data.begin() + meta_file.m_cbOffsetHeader, 
                                     all_decompressed_data.begin() + meta_file.m_cbOffsetHeader + meta_file.Size);
         IdfMetadata idf_m = readIdfMetadata(idf_meta_stream);
+        details.min_data_id = idf_m.min_data_id;
     
         // Read IDF with error correction
         int correction = error_code ? 4 : 0;
@@ -291,13 +292,13 @@ void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFile
             for (idx_t i = 0; i < row_count; i++) {
                 auto index = details.decoded_indices[start_row + i];
                 auto val = details.dictionary_cache[index];
-                output.SetValue(col_idx, i, Value(std::stoi(val) / 10000.0000));
+                output.SetValue(col_idx, i, Value(std::stoi(val) / 10000.0));
             }
         } else if (details.DataType == 9) { // DATE
             for (idx_t i = 0; i < row_count; i++) {
                 auto index = details.decoded_indices[start_row + i];
                 auto val = details.dictionary_cache[index];
-                auto dd = date_t(0) + static_cast<int>(std::stod(val)) - 25569; // EPOCH_ADJUSTMENT
+                auto dd = date_t(0) + static_cast<int>(std::stod(val)) - EPOCH_ADJUSTMENT - details.min_data_id;
                 output.SetValue(col_idx, i, Value::DATE(dd));
             }
         } else {
@@ -323,7 +324,7 @@ void VertipaqDecoder::processVertipaqData(VertipaqDetails &details, VertipaqFile
         if (details.DataType == 10) { //DOUBLE or FLOAT
             for (idx_t i = 0; i < row_count; i++) {
                 auto index = details.decoded_indices[start_row + i];
-                auto val = (index + details.BaseId) / details.Magnitude / 10000.0000;
+                auto val = (index + details.BaseId) / details.Magnitude / 10000.0;
                 output.SetValue(col_idx, i, val);
             }
         } else {

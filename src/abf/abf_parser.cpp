@@ -196,7 +196,7 @@ std::vector<uint8_t> AbfParser::iterate_and_decompress_blocks(duckdb::FileHandle
         file_handle_p.Read(reinterpret_cast<char *>(&compressed_size), sizeof(compressed_size));
         bytes_read += sizeof(uncompressed_size) + sizeof(compressed_size);
 
-        // Skip blocks if not within the last `trailing_blocks` (based on your logic)
+        // Skip blocks if not within the last `trailing_blocks`
         if (total_blocks > trailing_blocks && block_index < (total_blocks - trailing_blocks))
         {
             skip_offset += uncompressed_size;

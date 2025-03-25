@@ -90,7 +90,7 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 		result->rows_per_group = optional_idx();
 	} else {
 		// Use the default rows_per_group if row_id_info is valid
-		result->rows_per_group = optional_idx(122880); // Default from your original code
+		result->rows_per_group = optional_idx(122880);
 	}
 
 	result->names = names;

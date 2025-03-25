@@ -19,6 +19,7 @@ struct VertipaqDetails {
 	int64_t BaseId;
 	double Magnitude;
 	int64_t IsNullable;
+	int64_t min_data_id;
 	// Add tracking for current position in data
 	idx_t current_position = 0;
 	// Cache decoded data

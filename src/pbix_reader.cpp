@@ -50,7 +50,7 @@ struct PbixGlobalState : public GlobalTableFunctionState {
 	mutex lock;
 	idx_t position = 0;
 	idx_t max_threads;
-	idx_t rows_per_group = 122880; // Default value from your code
+	idx_t rows_per_group = 122880;
 
 	idx_t MaxThreads() const override {
 		return max_threads;
