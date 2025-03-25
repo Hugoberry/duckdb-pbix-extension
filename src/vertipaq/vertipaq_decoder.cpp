@@ -261,7 +261,7 @@ namespace duckdb
                             all_decompressed_data.begin() + idf_file.m_cbOffsetHeader + idf_file.Size - correction);
     
         //if isNullable treat min_data_id as blank
-        int null_adjustment = details.IsNullable && details.DataType==2 ? 1 : 0;
+        int null_adjustment = details.IsNullable ? 1 : 0;
     
         // Cache decoded indices
         details.decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
