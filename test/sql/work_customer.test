@@ -11,7 +11,7 @@ SELECT
   (SELECT COUNT(CustomerKey) FROM pbix_read('data/work.pbix', 'Customer')) AS pbix_count,
   (SELECT COUNT(CustomerKey) FROM 'data/work/Customer.csv') AS csv_count;
 ----
-1156	1156
+18485	18485
 
 # Check if any values differ
 query I
