@@ -1,0 +1,26 @@
+# name: test/sql/work_date.test
+# description: Test that date data in PBIX matches CSV file
+# group: [pbix]
+
+# Load required extension
+require pbix
+
+# Compare row counts between the two sources
+query II
+SELECT 
+  (SELECT COUNT(DateKey) FROM pbix_read('data/work.pbix', 'Date')) AS pbix_count,
+  (SELECT COUNT(DateKey) FROM 'data/work/Date.csv') AS csv_count;
+----
+1461	1461
+
+# Check if any values differ
+query I
+SELECT COUNT(*) AS mismatched_dates FROM (
+  SELECT DateKey, "Date", "Fiscal Year", "Fiscal Quarter", "Month", "MonthKey", "Full Date", "Month Number Of Year"
+  FROM pbix_read('data/work.pbix', 'Date')
+  EXCEPT
+  SELECT DateKey, "Date", "Fiscal Year", "Fiscal Quarter", "Month", "MonthKey", "Full Date", "Month Number Of Year"
+  FROM 'data/work/Date.csv'
+) AS diff;
+----
+0

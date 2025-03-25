@@ -1,0 +1,27 @@
+# name: test/sql/work_customer.test
+# description: Test that customer data in PBIX matches CSV file
+# group: [pbix]
+
+# Load required extension
+require pbix
+
+# Compare row counts between the two sources
+query II
+SELECT 
+  (SELECT COUNT(CustomerKey) FROM pbix_read('data/work.pbix', 'Customer')) AS pbix_count,
+  (SELECT COUNT(CustomerKey) FROM 'data/work/Customer.csv') AS csv_count;
+----
+18485	18485
+
+# Check if any values differ
+query I
+SELECT COUNT(*) AS mismatched_customers FROM (
+  SELECT CustomerKey, "Customer ID", Customer, City, "State-Province", "Country-Region", "Postal Code" 
+  FROM pbix_read('data/work.pbix', 'Customer')
+  EXCEPT
+  SELECT CustomerKey, "Customer ID", Customer, City, "State-Province", "Country-Region", "Postal Code" 
+  FROM 'data/work/Customer.csv'
+) AS diff;
+----
+0
+

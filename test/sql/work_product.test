@@ -1,0 +1,28 @@
+# name: test/sql/work_product.test
+# description: Test that product data in PBIX matches CSV file
+# group: [pbix]
+
+# Load required extension
+require pbix
+
+# Compare row counts between the two sources
+query II
+SELECT 
+  (SELECT COUNT(ProductKey) FROM pbix_read('data/work.pbix', 'Product')) AS pbix_count,
+  (SELECT COUNT(ProductKey) FROM 'data/work/Product.csv') AS csv_count;
+----
+397	397
+
+# Check if any values differ
+query I
+SELECT COUNT(*) AS mismatched_products FROM (
+  SELECT ProductKey, Product, "Standard Cost"::int as "Standard Cost", Color/*, "List Price"::int as "List Price"*/, Model, Subcategory, 
+         Category, SKU, "Safety Stock Level", "Reorder Point", Class 
+  FROM pbix_read('data/work.pbix', 'Product')
+  EXCEPT
+  SELECT ProductKey, Product, "Standard Cost"::int as "Standard Cost", Color/*, "List Price"::int as "List Price"*/, Model, Subcategory, 
+         Category, SKU, "Safety Stock Level", "Reorder Point", Class 
+  FROM 'data/work/Product.csv'
+) AS diff;
+----
+0

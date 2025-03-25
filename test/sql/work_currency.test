@@ -1,0 +1,25 @@
+# name: test/sql/work_currency.test
+# description: Test that currency data in PBIX matches CSV file
+# group: [pbix]
+
+# Load required extension
+require pbix
+
+# Compare row counts between the two sources
+query II
+SELECT 
+  (SELECT COUNT(CurrencyKey) FROM pbix_read('data/work.pbix', 'Currency')) AS pbix_count,
+  (SELECT COUNT(CurrencyKey) FROM 'data/work/Currency.csv') AS csv_count;
+----
+105	105
+
+# Check if any values differ
+query I
+SELECT COUNT(*) AS mismatched_codes FROM (
+  SELECT Code, Currency, "Format String" FROM pbix_read('data/work.pbix', 'Currency')
+  EXCEPT
+  SELECT Code, Currency, "Format String" FROM 'data/work/Currency.csv'
+) AS diff;
+----
+0
+
