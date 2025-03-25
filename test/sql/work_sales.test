@@ -1,0 +1,30 @@
+# name: test/sql/work_sales.test
+# description: Test that sales data in PBIX matches CSV file
+# group: [pbix]
+
+# Load required extension
+require pbix
+
+# Compare row counts between the two sources
+query II
+SELECT 
+  (SELECT COUNT(SalesOrderLineKey) FROM pbix_read('data/work.pbix', 'Sales')) AS pbix_count,
+  (SELECT COUNT(SalesOrderLineKey) FROM 'data/work/Sales.csv') AS csv_count;
+----
+121253	121253
+
+# Check if any values differ
+query I
+SELECT COUNT(*) AS mismatched_sales FROM (
+  SELECT SalesOrderLineKey,ResellerKey,CustomerKey,ProductKey,OrderDateKey,DueDateKey,ShipDateKey,
+  SalesTerritoryKey,"Order Quantity","Unit Price","Extended Amount","Product Standard Cost",
+  "Total Product Cost","Sales Amount","Unit Price Discount Pct",CurrencyKey
+  FROM pbix_read('data/work.pbix', 'Sales')
+  EXCEPT
+  SELECT SalesOrderLineKey,ResellerKey,CustomerKey,ProductKey,OrderDateKey,DueDateKey,ShipDateKey,
+  SalesTerritoryKey,"Order Quantity","Unit Price","Extended Amount","Product Standard Cost",
+  "Total Product Cost","Sales Amount","Unit Price Discount Pct",CurrencyKey
+  FROM 'data/work/Sales.csv'
+) AS diff;
+----
+0

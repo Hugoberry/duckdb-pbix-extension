@@ -1,0 +1,26 @@
+# name: test/sql/work_sales_territory.test
+# description: Test that sales territory data in PBIX matches CSV file
+# group: [pbix]
+
+# Load required extension
+require pbix
+
+# Compare row counts between the two sources
+query II
+SELECT 
+  (SELECT COUNT(SalesTerritoryKey) FROM pbix_read('data/work.pbix', 'Sales Territory')) AS pbix_count,
+  (SELECT COUNT(SalesTerritoryKey) FROM 'data/work/Sales Territory.csv') AS csv_count;
+----
+11	11
+
+# Check if any values differ
+query I
+SELECT COUNT(*) AS mismatched_territories FROM (
+  SELECT SalesTerritoryKey, Region, Country, "Group"
+  FROM pbix_read('data/work.pbix', 'Sales Territory')
+  EXCEPT
+  SELECT SalesTerritoryKey, Region, Country, "Group"
+  FROM 'data/work/Sales Territory.csv'
+) AS diff;
+----
+0

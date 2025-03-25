@@ -1,0 +1,26 @@
+# name: test/sql/work_reseller.test
+# description: Test that reseller data in PBIX matches CSV file
+# group: [pbix]
+
+# Load required extension
+require pbix
+
+# Compare row counts between the two sources
+query II
+SELECT 
+  (SELECT COUNT(ResellerKey) FROM pbix_read('data/work.pbix', 'Reseller')) AS pbix_count,
+  (SELECT COUNT(ResellerKey) FROM 'data/work/Reseller.csv') AS csv_count;
+----
+702	702
+
+# Check if any values differ
+query I
+SELECT COUNT(*) AS mismatched_resellers FROM (
+  SELECT ResellerKey, "Business Type", Reseller, City, "State-Province", "Country-Region", "Postal Code"
+  FROM pbix_read('data/work.pbix', 'Reseller')
+  EXCEPT
+  SELECT ResellerKey, "Business Type", Reseller, City, "State-Province", "Country-Region", "Postal Code"
+  FROM 'data/work/Reseller.csv'
+) AS diff;
+----
+0
