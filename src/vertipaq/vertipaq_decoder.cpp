@@ -264,14 +264,16 @@ namespace duckdb
         //if isNullable treat min_data_id as blank
         int null_adjustment = details.IsNullable ? 1 : 0;
     
-        // Cache decoded indices
-        details.decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
-    
         // Cache dictionary if needed
         if (details.Dictionary != "") {
+            // Cache decoded indices
+            details.decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id - null_adjustment, idf_m.bit_width);
             std::string dictionary_stream(all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader, 
                                          all_decompressed_data.begin() + vfiles[details.Dictionary].m_cbOffsetHeader + vfiles[details.Dictionary].Size);
             details.dictionary_cache = readDictionary(dictionary_stream, idf_m.min_data_id);
+        } else { //HIDX case
+            // Cache decoded indices
+            details.decoded_indices = readRLEBitPackedHybrid(idf_stream, idf_m.count_bit_packed, idf_m.min_data_id, idf_m.bit_width);
         }
     
         details.is_initialized = true;

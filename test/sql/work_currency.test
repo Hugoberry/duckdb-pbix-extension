@@ -16,9 +16,9 @@ SELECT
 # Check if any values differ
 query I
 SELECT COUNT(*) AS mismatched_codes FROM (
-  SELECT Code, Currency, "Format String" FROM pbix_read('data/work.pbix', 'Currency')
+  SELECT CurrencyKey, Code, Currency, "Format String" FROM pbix_read('data/work.pbix', 'Currency')
   EXCEPT
-  SELECT Code, Currency, "Format String" FROM 'data/work/Currency.csv'
+  SELECT CurrencyKey, Code, Currency, "Format String" FROM 'data/work/Currency.csv'
 ) AS diff;
 ----
 0
