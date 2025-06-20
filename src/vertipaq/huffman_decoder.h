@@ -8,7 +8,7 @@
 #include <string>
 #include <queue>
 #include <iomanip>
-
+#include <cstdint>
 // Huffman Tree Node definition
 struct HuffmanTree {
     uint8_t c;
