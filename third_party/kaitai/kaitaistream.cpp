@@ -1,40 +1,45 @@
 #include <kaitai/kaitaistream.h>
 #include <kaitai/exceptions.h>
 
-#if defined(__APPLE__)
-#include <machine/endian.h>
-#include <libkern/OSByteOrder.h>
-#define bswap_16(x) OSSwapInt16(x)
-#define bswap_32(x) OSSwapInt32(x)
-#define bswap_64(x) OSSwapInt64(x)
-#define __BYTE_ORDER    BYTE_ORDER
-#define __BIG_ENDIAN    BIG_ENDIAN
-#define __LITTLE_ENDIAN LITTLE_ENDIAN
-#elif defined(_MSC_VER) // !__APPLE__
-#include <stdlib.h>
-#define __LITTLE_ENDIAN     1234
-#define __BIG_ENDIAN        4321
-#define __BYTE_ORDER        __LITTLE_ENDIAN
-#define bswap_16(x) _byteswap_ushort(x)
-#define bswap_32(x) _byteswap_ulong(x)
-#define bswap_64(x) _byteswap_uint64(x)
-#elif defined(__QNX__) // __QNX__
-#include <sys/param.h>
-#include <gulliver.h>
-#define bswap_16(x) ENDIAN_RET16(x)
-#define bswap_32(x) ENDIAN_RET32(x)
-#define bswap_64(x) ENDIAN_RET64(x)
-#define __BYTE_ORDER    BYTE_ORDER
-#define __BIG_ENDIAN    BIG_ENDIAN
-#define __LITTLE_ENDIAN LITTLE_ENDIAN
-#else // !__APPLE__ or !_MSC_VER or !__QNX__
-#include <endian.h>
-#include <byteswap.h>
-#endif
-
 #include <iostream>
 #include <vector>
 #include <stdexcept>
+
+// --- Cross-Platform Endianness and Byte Swap ---
+#if defined(_WIN32)
+    // For all Windows compilers (MSVC, MinGW, etc.)
+    // Windows on x86/x64 is always little-endian.
+    #include <stdlib.h>
+    #define __LITTLE_ENDIAN     1234
+    #define __BIG_ENDIAN        4321
+    #define __BYTE_ORDER        __LITTLE_ENDIAN
+    #define bswap_16(x) _byteswap_ushort(x)
+    #define bswap_32(x) _byteswap_ulong(x)
+    #define bswap_64(x) _byteswap_uint64(x)
+
+#elif defined(__APPLE__)
+    // For macOS and iOS (Clang/Apple LLVM)
+    #include <libkern/OSByteOrder.h>
+    #include <machine/endian.h> // Provides BYTE_ORDER, BIG_ENDIAN, LITTLE_ENDIAN
+
+    // Define the byte-swap functions using Apple's implementation
+    #define bswap_16(x) OSSwapInt16(x)
+    #define bswap_32(x) OSSwapInt32(x)
+    #define bswap_64(x) OSSwapInt64(x)
+
+    #define __BYTE_ORDER    BYTE_ORDER
+    #define __BIG_ENDIAN    BIG_ENDIAN
+    #define __LITTLE_ENDIAN LITTLE_ENDIAN
+
+#elif defined(__GNUC__) || defined(__clang__)
+    // For GCC, Clang on Linux, etc.
+    // These headers provide the standardized __BYTE_ORDER and bswap_* functions.
+    #include <byteswap.h>
+    #include <endian.h>
+
+#else
+    #error "Unsupported compiler/platform: Unable to determine endianness or byte-swap functions."
+#endif
 
 kaitai::kstream::kstream(std::istream *io) {
     m_io = io;
