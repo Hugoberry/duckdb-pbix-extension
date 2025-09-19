@@ -9,16 +9,14 @@
 using namespace duckdb;
 
 
-class PbixExtension : public Extension {
+class PbixExtension{
 public:
-	std::string Name() override {
+	static void Load(ExtensionLoader &loader);
+	static std::string Name() {
 		return "pbix";
 	}
-	void Load(DuckDB &db) override;
+	static std::string Version() {
+		return DuckDB::LibraryVersion();
+	}
 };
 
-extern "C" {
-DUCKDB_EXTENSION_API void pbix_init(duckdb::DatabaseInstance &db);
-DUCKDB_EXTENSION_API const char *pbix_version();
-
-}
