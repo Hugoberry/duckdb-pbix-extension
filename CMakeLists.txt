@@ -32,6 +32,12 @@ else()
     add_definitions(-DKS_STR_ENCODING_ICONV)
 endif()
 
+include_directories(src/include)
+include_directories(src/abf/include)
+include_directories(src/vertipaq/include)
+include_directories(src/vpax/include)
+
+
 project(${TARGET_NAME})
 include_directories(src/include)
 include_directories(third_party/sqlite)
