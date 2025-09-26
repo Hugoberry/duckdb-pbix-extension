@@ -60,7 +60,8 @@ bool VpaxUtils::CheckIfTableIsReferenced(SQLiteDB &db, const std::string &table_
         )";
         
         SQLiteStatement ref_stmt = db.Prepare(ref_sql);
-        ref_stmt.Bind(0, table_name);
+        // FIX: Use BindText for strings instead of Bind
+        ref_stmt.BindText(0, string_t(table_name));
         
         if (ref_stmt.Step()) {
             return ref_stmt.GetValue<int>(0) > 0;
@@ -84,8 +85,9 @@ bool VpaxUtils::CheckIfColumnIsReferenced(SQLiteDB &db, const std::string &table
         )";
         
         SQLiteStatement ref_stmt = db.Prepare(ref_sql);
-        ref_stmt.Bind(0, table_name);
-        ref_stmt.Bind(1, column_name);
+        // FIX: Use BindText for strings instead of Bind
+        ref_stmt.BindText(0, string_t(table_name));
+        ref_stmt.BindText(1, string_t(column_name));
         
         if (ref_stmt.Step()) {
             return ref_stmt.GetValue<int>(0) > 0;

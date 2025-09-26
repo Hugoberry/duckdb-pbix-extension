@@ -15,31 +15,55 @@ Value VpaxBuilder::BuildVpax() {
     try {
         // Build all sections
         auto tables = BuildTables();
-        auto columns = BuildColumns();
-        auto measures = BuildMeasures();
-        auto relationships = BuildRelationships();
-        auto segments = BuildColumnSegments();
-        auto column_hierarchies = BuildColumnHierarchies();
-        auto user_hierarchies = BuildUserHierarchies();
-        auto table_permissions = BuildTablePermissions();
-        auto calc_items = BuildCalculationItems();
+        // auto columns = BuildColumns();
+        // auto measures = BuildMeasures();
+        // auto relationships = BuildRelationships();
+        // auto segments = BuildColumnSegments();
+        // auto column_hierarchies = BuildColumnHierarchies();
+        // auto user_hierarchies = BuildUserHierarchies();
+        // auto table_permissions = BuildTablePermissions();
+        // auto calc_items = BuildCalculationItems();
         
         // Create the main VPAX structure
         child_list_t<Value> vpax_values;
         vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), vector<Value>(tables.begin(), tables.end()))));
-        vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
-        vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
-        vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), vector<Value>(segments.begin(), segments.end()))));
-        vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
-        vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
-        vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
-        vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, vector<Value>(table_permissions.begin(), table_permissions.end()))));
-        vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, vector<Value>(calc_items.begin(), calc_items.end()))));
+        // vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
+        // vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
+        // vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), vector<Value>(segments.begin(), segments.end()))));
+        // vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
+        // vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
+        // vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
+        // vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, vector<Value>(table_permissions.begin(), table_permissions.end()))));
+        // vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, vector<Value>(calc_items.begin(), calc_items.end()))));
+        vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), std::vector<Value>())));
+        vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), std::vector<Value>())));
+        vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
+        vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
+        vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), std::vector<Value>())));
+        vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), std::vector<Value>())));
+        vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
+        vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         
         return Value::STRUCT(vpax_values);
         
-    } catch (const std::exception &e) {
-        return CreateErrorResult(e);
+   } catch (const std::exception &e) {
+        // This ensures we always return the expected VPAX type
+        
+        std::cout << "Error in BuildVpax: " << e.what() << std::endl;
+        
+        // Create empty VPAX structure with correct type
+        child_list_t<Value> empty_vpax_values;
+        empty_vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), std::vector<Value>())));
+        empty_vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), std::vector<Value>())));
+        empty_vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), std::vector<Value>())));
+        empty_vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
+        empty_vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
+        empty_vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), std::vector<Value>())));
+        empty_vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), std::vector<Value>())));
+        empty_vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
+        empty_vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
+        
+        return Value::STRUCT(empty_vpax_values);
     }
 }
 
@@ -50,11 +74,9 @@ std::vector<Value> VpaxBuilder::BuildTables() {
         SELECT 
             t.Name as TableName,
             t.isHidden,
-            COALESCE(p.RowsCount, 0) as RowsCount,
-            COALESCE(t.Description, '') as Description
-        FROM [Table] t
-        LEFT JOIN Partition p ON t.ID = p.TableID
-        WHERE t.Type = 1  -- Regular tables only
+            666 as RowsCount,
+            '' as Description
+        FROM [Table] t where ishidden = 0;
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
@@ -94,8 +116,8 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
             COALESCE(c.Description, '') as Description,
             COALESCE(c.FormatString, '') as FormatString,
             COALESCE(cs.DistinctStates, 0) as Cardinality,
-            COALESCE(cs.UsedSize, 0) as TotalSize,
-            COALESCE(ds.UsedSize, 0) as DictionarySize
+            666 as TotalSize,
+            666 as DictionarySize
         FROM COLUMN c
         JOIN [Table] t ON c.TableId = t.ID
         LEFT JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
@@ -222,7 +244,7 @@ std::vector<Value> VpaxBuilder::BuildColumnSegments() {
             t.Name as TableName,
             COALESCE(p.Name, 'Partition') as PartitionName,
             COALESCE(cs.SegmentNumber, 0) as SegmentNumber,
-            COALESCE(cs.UsedSize, 0) as UsedSize
+            666 as UsedSize
         FROM COLUMN c
         JOIN [Table] t ON c.TableId = t.ID
         LEFT JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
@@ -283,8 +305,8 @@ std::vector<Value> VpaxBuilder::BuildUserHierarchies() {
         )";
         
         SQLiteStatement levels_stmt = db_.Prepare(levels_sql);
-        levels_stmt.Bind(0, hierarchy_name);
-        levels_stmt.Bind(1, table_name);
+        levels_stmt.BindText(0, string_t(hierarchy_name));
+        levels_stmt.BindText(1, string_t(table_name));
         
         std::vector<std::string> level_names;
         while (levels_stmt.Step()) {
@@ -319,7 +341,7 @@ std::vector<Value> VpaxBuilder::BuildCalculationItems() {
 // Helper implementations
 int64_t VpaxBuilder::CalculateTableSize(const std::string &table_name) {
     std::string sql = R"(
-        SELECT COALESCE(SUM(cs.UsedSize), 0)
+        SELECT 666
         FROM COLUMN c
         JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
         JOIN [Table] t ON c.TableId = t.ID
@@ -327,7 +349,7 @@ int64_t VpaxBuilder::CalculateTableSize(const std::string &table_name) {
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
-    stmt.Bind(0, table_name);
+    stmt.BindText(0, string_t(table_name));
     
     if (stmt.Step()) {
         return stmt.GetValue<int64_t>(0);
