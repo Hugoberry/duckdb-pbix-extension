@@ -26,18 +26,17 @@ Value VpaxBuilder::BuildVpax() {
         
         // Create the main VPAX structure
         child_list_t<Value> vpax_values;
-        vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), tables)));
-        vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), columns)));
-        vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), measures)));
-        vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), segments)));
-        vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), column_hierarchies)));
-        vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), user_hierarchies)));
-        vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), relationships)));
-        vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, table_permissions)));
-        vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, calc_items)));
+        vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), vector<Value>(tables.begin(), tables.end()))));
+        vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
+        vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
+        vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), vector<Value>(segments.begin(), segments.end()))));
+        vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
+        vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
+        vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
+        vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, vector<Value>(table_permissions.begin(), table_permissions.end()))));
+        vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, vector<Value>(calc_items.begin(), calc_items.end()))));
         
-        auto vpax_type = VpaxSchema::CreateVpaxType();
-        return Value::STRUCT(vpax_type, vpax_values);
+        return Value::STRUCT(vpax_values);
         
     } catch (const std::exception &e) {
         return CreateErrorResult(e);
@@ -292,7 +291,12 @@ std::vector<Value> VpaxBuilder::BuildUserHierarchies() {
             level_names.push_back(levels_stmt.GetValue<std::string>(0));
         }
         
-        std::string levels_string = StringUtil::Join(level_names, ", ");
+        // Build levels string manually
+        std::string levels_string = "";
+        for (size_t i = 0; i < level_names.size(); i++) {
+            if (i > 0) levels_string += ", ";
+            levels_string += level_names[i];
+        }
         
         hierarchies.push_back(VpaxValueFactory::CreateUserHierarchyValue(
             table_name, hierarchy_name, is_hidden, used_size, levels_string

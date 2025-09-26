@@ -30,8 +30,7 @@ Value VpaxValueFactory::CreateTableValue(
     table_values.push_back(make_pair("UserHierarchiesSize", Value::BIGINT(hierarchies_size)));
     table_values.push_back(make_pair("IsReferenced", Value::BOOLEAN(is_referenced)));
     
-    auto table_type = VpaxSchema::CreateTableType();
-    return Value::STRUCT(table_type, table_values);
+    return Value::STRUCT(table_values);
 }
 
 Value VpaxValueFactory::CreateColumnValue(
@@ -80,8 +79,7 @@ Value VpaxValueFactory::CreateColumnValue(
     column_values.push_back(make_pair("TotalSize", Value::BIGINT(total_size)));
     column_values.push_back(make_pair("Selectivity", Value::DOUBLE(selectivity)));
     
-    auto column_type = VpaxSchema::CreateColumnType();
-    return Value::STRUCT(column_type, column_values);
+    return Value::STRUCT(column_values);
 }
 
 Value VpaxValueFactory::CreateMeasureValue(
@@ -111,8 +109,7 @@ Value VpaxValueFactory::CreateMeasureValue(
     measure_values.push_back(make_pair("KpiTrendExpression", Value())); // NULL
     measure_values.push_back(make_pair("IsReferenced", Value::BOOLEAN(is_referenced)));
     
-    auto measure_type = VpaxSchema::CreateMeasureType();
-    return Value::STRUCT(measure_type, measure_values);
+    return Value::STRUCT(measure_values);
 }
 
 Value VpaxValueFactory::CreateRelationshipValue(
@@ -154,8 +151,7 @@ Value VpaxValueFactory::CreateRelationshipValue(
     rel_values.push_back(make_pair("InvalidRows", Value::BIGINT(invalid_rows)));
     rel_values.push_back(make_pair("OneToManyRatio", Value::DOUBLE(one_to_many_ratio)));
     
-    auto rel_type = VpaxSchema::CreateRelationshipType();
-    return Value::STRUCT(rel_type, rel_values);
+    return Value::STRUCT(rel_values);
 }
 
 Value VpaxValueFactory::CreateColumnSegmentValue(
@@ -193,8 +189,7 @@ Value VpaxValueFactory::CreateColumnSegmentValue(
     segment_values.push_back(make_pair("Temperature", Value())); // NULL
     segment_values.push_back(make_pair("LastAccessed", Value())); // NULL
     
-    auto segment_type = VpaxSchema::CreateColumnSegmentType();
-    return Value::STRUCT(segment_type, segment_values);
+    return Value::STRUCT(segment_values);
 }
 
 Value VpaxValueFactory::CreateUserHierarchyValue(
@@ -211,8 +206,7 @@ Value VpaxValueFactory::CreateUserHierarchyValue(
     hierarchy_values.push_back(make_pair("UsedSize", Value::BIGINT(used_size)));
     hierarchy_values.push_back(make_pair("Levels", Value(levels)));
     
-    auto hierarchy_type = VpaxSchema::CreateUserHierarchyType();
-    return Value::STRUCT(hierarchy_type, hierarchy_values);
+    return Value::STRUCT(hierarchy_values);
 }
 
 Value VpaxValueFactory::CreateErrorValue(
@@ -226,6 +220,5 @@ Value VpaxValueFactory::CreateErrorValue(
     error_values.push_back(make_pair("file", Value(file_name)));
     error_values.push_back(make_pair("section", Value(section)));
     
-    auto error_type = VpaxSchema::CreateErrorType();
-    return Value::STRUCT(error_type, error_values);
+    return Value::STRUCT(error_values);
 }

@@ -17,7 +17,7 @@ void VpaxFunction::Execute(DataChunk &args, ExpressionState &state, Vector &resu
             // Extract SQLite database from PBIX file
             SQLiteDB db;
             SQLiteOpenOptions options;
-            options.access_mode = AccessMode::read_only;
+            options.access_mode = AccessMode::READ_ONLY;
             
             // Get trailing chunks from config (default 15)
             int trailing_chunks = 15;
@@ -70,7 +70,7 @@ void VpaxFunction::Register(ExtensionLoader &loader) {
     );
     
     // Mark as having side effects (file I/O)
-    pbix2vpax.side_effects = FunctionSideEffects::HAS_SIDE_EFFECTS;
+    // pbix2vpax.side_effects = FunctionSideEffects::HAS_SIDE_EFFECTS;
     
     // Register with DuckDB
     loader.RegisterFunction(pbix2vpax);
