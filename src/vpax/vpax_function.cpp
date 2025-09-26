@@ -35,15 +35,13 @@ void VpaxFunction::Execute(DataChunk &args, ExpressionState &state, Vector &resu
             Value vpax_result = builder.BuildVpax();
             
             // Set result
-            auto result_data = FlatVector::GetData<struct_entry_t>(result);
-            result_data[i] = vpax_result.GetValue<struct_entry_t>();
+            result.SetValue(i, vpax_result);
             
         } catch (const std::exception &e) {
             // Return error structure
             Value error_result = VpaxValueFactory::CreateErrorValue(e.what(), file_name, "Execute");
             
-            auto result_data = FlatVector::GetData<struct_entry_t>(result);
-            result_data[i] = error_result.GetValue<struct_entry_t>();
+            result.SetValue(i, error_result);
         }
     }
 }
