@@ -48,10 +48,10 @@ void VpaxFunction::Execute(DataChunk &args, ExpressionState &state, Vector &resu
     }
 }
 
-std::unique_ptr<FunctionData> VpaxFunction::Bind(
+unique_ptr<FunctionData> VpaxFunction::Bind(
     ClientContext &context, 
     ScalarFunction &bound_function,
-    std::vector<std::unique_ptr<Expression>> &arguments) {
+    vector<unique_ptr<Expression>> &arguments) {
     
     // Set the return type to the complete VPAX schema
     bound_function.return_type = VpaxSchema::CreateVpaxType();
@@ -65,10 +65,10 @@ void VpaxFunction::Register(ExtensionLoader &loader) {
         "pbix2vpax",                           // Function name
         {LogicalType::VARCHAR},                 // Input: filename
         LogicalType::STRUCT({}),               // Output: Will be set in bind function
-        VpaxFunction::Execute,                 // Implementation
-        VpaxFunction::Bind                     // Bind function
+        VpaxFunction::Execute                 // Implementation
     );
     
+    pbix2vpax.bind = VpaxFunction::Bind;
     // Mark as having side effects (file I/O)
     // pbix2vpax.side_effects = FunctionSideEffects::HAS_SIDE_EFFECTS;
     

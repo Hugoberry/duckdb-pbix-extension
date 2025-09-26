@@ -52,10 +52,10 @@ public:
     static void Execute(DataChunk &args, ExpressionState &state, Vector &result);
     
     // Function binding
-    static std::unique_ptr<FunctionData> Bind(
+    static unique_ptr<FunctionData> Bind(
         ClientContext &context, 
         ScalarFunction &bound_function,
-        std::vector<std::unique_ptr<Expression>> &arguments
+        vector<unique_ptr<Expression>> &arguments
     );
     
     // Register with DuckDB
