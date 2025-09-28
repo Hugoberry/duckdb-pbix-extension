@@ -15,7 +15,7 @@ Value VpaxBuilder::BuildVpax() {
     try {
         // Build all sections
         auto tables = BuildTables();
-        // auto columns = BuildColumns();
+        auto columns = BuildColumns();
         // auto measures = BuildMeasures();
         // auto relationships = BuildRelationships();
         // auto segments = BuildColumnSegments();
@@ -27,7 +27,7 @@ Value VpaxBuilder::BuildVpax() {
         // Create the main VPAX structure
         child_list_t<Value> vpax_values;
         vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), vector<Value>(tables.begin(), tables.end()))));
-        // vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
+        vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
         // vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
         // vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), vector<Value>(segments.begin(), segments.end()))));
         // vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
@@ -35,7 +35,7 @@ Value VpaxBuilder::BuildVpax() {
         // vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
         // vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, vector<Value>(table_permissions.begin(), table_permissions.end()))));
         // vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, vector<Value>(calc_items.begin(), calc_items.end()))));
-        vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), std::vector<Value>())));
+        // vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
@@ -115,7 +115,7 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
             c.isUnique,
             COALESCE(c.Description, '') as Description,
             COALESCE(c.FormatString, '') as FormatString,
-            COALESCE(cs.DistinctStates, 0) as Cardinality,
+            0 as Cardinality,
             666 as TotalSize,
             666 as DictionarySize
         FROM COLUMN c
