@@ -115,7 +115,7 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
             c.isUnique,
             COALESCE(c.Description, '') as Description,
             COALESCE(c.FormatString, '') as FormatString,
-            0 as Cardinality,
+            COALESCE(cs.Statistics_DistinctStates,0) as Cardinality,
             666 as TotalSize,
             666 as DictionarySize
         FROM COLUMN c
