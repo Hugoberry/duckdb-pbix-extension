@@ -17,7 +17,7 @@ Value VpaxBuilder::BuildVpax() {
         auto tables = BuildTables();
         auto columns = BuildColumns();
         auto measures = BuildMeasures();
-        // auto relationships = BuildRelationships();
+        auto relationships = BuildRelationships();
         // auto segments = BuildColumnSegments();
         // auto column_hierarchies = BuildColumnHierarchies();
         auto user_hierarchies = BuildUserHierarchies();
@@ -32,12 +32,11 @@ Value VpaxBuilder::BuildVpax() {
         // vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), vector<Value>(segments.begin(), segments.end()))));
         // vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
         vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
-        // vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
+        vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
         // vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, vector<Value>(table_permissions.begin(), table_permissions.end()))));
         // vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, vector<Value>(calc_items.begin(), calc_items.end()))));
         vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
-        vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         
@@ -237,19 +236,41 @@ std::vector<Value> VpaxBuilder::BuildRelationships() {
     
     std::string sql = R"(
         SELECT 
-            tf.Name as FromTableName,
-            cf.ExplicitName as FromColumnName,
-            tt.Name as ToTableName,
-            ct.ExplicitName as ToColumnName,
-            r.IsActive,
-            r.CrossFilteringBehavior,
-            r.RelyOnReferentialIntegrity,
-            COALESCE(r.JoinOnDateBehavior, 0) as JoinOnDateBehavior
-        FROM Relationship r
-        JOIN COLUMN cf ON r.FromColumnID = cf.ID
-        JOIN [Table] tf ON cf.TableId = tf.ID
-        JOIN COLUMN ct ON r.ToColumnID = ct.ID
-        JOIN [Table] tt ON ct.TableId = tt.ID
+            ft.Name AS FromTableName,
+            fc.ExplicitName AS FromColumnName,
+            tt.Name AS ToTableName,
+            tc.ExplicitName AS ToColumnName,
+            rel.IsActive,
+            CASE 
+                WHEN rel.FromCardinality = 2 THEN 'Many'
+                ELSE 'One'
+            END AS FromCardinalityType,
+            CASE 
+                WHEN rel.ToCardinality = 2 THEN 'Many'
+                ELSE 'One'
+            END AS ToCardinalityType,
+            CASE 
+                WHEN rel.CrossFilteringBehavior = 1 THEN 'Single'
+                WHEN rel.CrossFilteringBehavior = 2 THEN 'Both'
+                ELSE CAST(rel.CrossFilteringBehavior AS TEXT)
+            END AS CrossFilteringBehavior,
+            rid.RecordCount as UsedSizeFrom,
+            rid2.RecordCount AS UsedSizeTo,
+            rel.RelyOnReferentialIntegrity,
+            rel.JoinOnDateBehavior,
+            rel.Type,
+            rel.SecurityFilteringBehavior,
+            rel.FromCardinality,
+            rel.ToCardinality
+        FROM Relationship rel
+            LEFT JOIN [Table] ft ON rel.FromTableID = ft.id
+            LEFT JOIN [Column] fc ON rel.FromColumnID = fc.id
+            LEFT JOIN [Table] tt ON rel.ToTableID = tt.id AND tt.systemflags = 0
+            LEFT JOIN [Column] tc ON rel.ToColumnID = tc.id
+            LEFT JOIN RelationshipStorage rs ON rs.id = rel.RelationshipStorageID
+            LEFT JOIN RelationshipIndexStorage rid ON rs.RelationshipIndexStorageID = rid.id
+            LEFT JOIN RelationshipStorage rs2 ON rs2.id = rel.RelationshipStorage2ID
+            LEFT JOIN RelationshipIndexStorage rid2 ON rs2.RelationshipIndexStorageID = rid2.id
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
@@ -259,15 +280,48 @@ std::vector<Value> VpaxBuilder::BuildRelationships() {
         std::string to_table = stmt.GetValue<std::string>(2);
         std::string to_column = stmt.GetValue<std::string>(3);
         bool is_active = stmt.GetValue<int>(4) != 0;
-        int cross_filter = stmt.GetValue<int>(5);
-        bool rely_on_ri = stmt.GetValue<int>(6) != 0;
+        std::string from_cardinality_type = stmt.GetValue<std::string>(5);
+        std::string to_cardinality_type = stmt.GetValue<std::string>(6);
+        std::string cross_filtering = stmt.GetValue<std::string>(7);
+        int64_t used_size_from = stmt.GetValue<int64_t>(8);
+        int64_t used_size_to = stmt.GetValue<int64_t>(9);
+        bool rely_on_ri = stmt.GetValue<int>(10) != 0;
+        int join_on_date_behavior = stmt.GetValue<int>(11);
+        int relationship_type = stmt.GetValue<int>(12);
+        int security_filtering_behavior = stmt.GetValue<int>(13);
+        int64_t from_cardinality = stmt.GetValue<int64_t>(14);
+        int64_t to_cardinality = stmt.GetValue<int64_t>(15);
         
-        std::string cross_filtering = "OneDirection";
-        if (cross_filter == 2) cross_filtering = "BothDirections";
+        // Convert join on date behavior
+        std::string join_behavior = "DateAndTime";
+        if (join_on_date_behavior == 1) {
+            join_behavior = "DatePartOnly";
+        }
+        
+        // Convert relationship type
+        std::string rel_type = "Regular";
+        if (relationship_type == 1) {
+            rel_type = "Limited";
+        }
+        
+        // Convert security filtering behavior
+        std::string security_behavior = "OneDirection";
+        if (security_filtering_behavior == 2) {
+            security_behavior = "BothDirections";
+        }
+        
+        // Map CrossFilteringBehavior to match expected values
+        if (cross_filtering == "Single") {
+            cross_filtering = "OneDirection";
+        } else if (cross_filtering == "Both") {
+            cross_filtering = "BothDirections";
+        }
         
         relationships.push_back(VpaxValueFactory::CreateRelationshipValue(
             from_table, from_column, to_table, to_column, is_active,
-            0, 0, cross_filtering, "Regular", rely_on_ri
+            from_cardinality, to_cardinality, from_cardinality_type, to_cardinality_type,
+            cross_filtering, rel_type, rely_on_ri, used_size_from, used_size_to,
+            used_size_from + used_size_to, 0, 0, 0.0, join_behavior, security_behavior
         ));
     }
     

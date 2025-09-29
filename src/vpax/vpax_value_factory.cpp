@@ -134,32 +134,38 @@ Value VpaxValueFactory::CreateRelationshipValue(
     bool is_active,
     int64_t from_cardinality,
     int64_t to_cardinality,
+    const std::string &from_cardinality_type,
+    const std::string &to_cardinality_type,
     const std::string &cross_filtering,
     const std::string &relationship_type,
     bool rely_on_ri,
+    int64_t used_size_from,
+    int64_t used_size_to,
     int64_t used_size,
     int64_t missing_keys,
     int64_t invalid_rows,
-    double one_to_many_ratio) {
+    double one_to_many_ratio,
+    const std::string &join_on_date_behavior,
+    const std::string &security_filtering_behavior) {
     
     child_list_t<Value> rel_values;
     rel_values.push_back(make_pair("FromTableName", Value(from_table)));
     rel_values.push_back(make_pair("FromFullColumnName", Value(from_table + "[" + from_column + "]")));
     rel_values.push_back(make_pair("FromCardinality", Value::BIGINT(from_cardinality)));
-    rel_values.push_back(make_pair("FromCardinalityType", Value("Many")));
+    rel_values.push_back(make_pair("FromCardinalityType", Value(from_cardinality_type)));
     rel_values.push_back(make_pair("ToTableName", Value(to_table)));
     rel_values.push_back(make_pair("ToFullColumnName", Value(to_table + "[" + to_column + "]")));
     rel_values.push_back(make_pair("ToCardinality", Value::BIGINT(to_cardinality)));
-    rel_values.push_back(make_pair("ToCardinalityType", Value("One")));
+    rel_values.push_back(make_pair("ToCardinalityType", Value(to_cardinality_type)));
     rel_values.push_back(make_pair("RelyOnReferentialIntegrity", Value::BOOLEAN(rely_on_ri)));
-    rel_values.push_back(make_pair("JoinOnDateBehavior", Value("DateAndTime")));
+    rel_values.push_back(make_pair("JoinOnDateBehavior", Value(join_on_date_behavior)));
     rel_values.push_back(make_pair("CrossFilteringBehavior", Value(cross_filtering)));
     rel_values.push_back(make_pair("RelationshipType", Value(relationship_type)));
     rel_values.push_back(make_pair("IsActive", Value::BOOLEAN(is_active)));
     rel_values.push_back(make_pair("RelationshipName", Value("")));
-    rel_values.push_back(make_pair("SecurityFilteringBehavior", Value("OneDirection")));
-    rel_values.push_back(make_pair("UsedSizeFrom", Value::BIGINT(0)));
-    rel_values.push_back(make_pair("UsedSizeTo", Value::BIGINT(0)));
+    rel_values.push_back(make_pair("SecurityFilteringBehavior", Value(security_filtering_behavior)));
+    rel_values.push_back(make_pair("UsedSizeFrom", Value::BIGINT(used_size_from)));
+    rel_values.push_back(make_pair("UsedSizeTo", Value::BIGINT(used_size_to)));
     rel_values.push_back(make_pair("UsedSize", Value::BIGINT(used_size)));
     rel_values.push_back(make_pair("MissingKeys", Value::BIGINT(missing_keys)));
     rel_values.push_back(make_pair("InvalidRows", Value::BIGINT(invalid_rows)));

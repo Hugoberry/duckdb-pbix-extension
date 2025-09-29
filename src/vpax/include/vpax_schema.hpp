@@ -91,13 +91,19 @@ public:
         bool is_active = true,
         int64_t from_cardinality = 0,
         int64_t to_cardinality = 0,
+        const std::string &from_cardinality_type = "Many",
+        const std::string &to_cardinality_type = "One",
         const std::string &cross_filtering = "OneDirection",
         const std::string &relationship_type = "Regular",
         bool rely_on_ri = false,
+        int64_t used_size_from = 0,
+        int64_t used_size_to = 0,
         int64_t used_size = 0,
         int64_t missing_keys = 0,
         int64_t invalid_rows = 0,
-        double one_to_many_ratio = 0.0
+        double one_to_many_ratio = 0.0,
+        const std::string &join_on_date_behavior = "DateAndTime",
+        const std::string &security_filtering_behavior = "OneDirection"
     );
     
     static Value CreateColumnSegmentValue(
