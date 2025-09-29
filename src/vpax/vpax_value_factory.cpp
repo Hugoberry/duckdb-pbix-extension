@@ -46,6 +46,7 @@ Value VpaxValueFactory::CreateColumnValue(
     bool is_key,
     bool is_nullable,
     bool is_unique,
+    const std::string &display_folder,
     const std::string &encoding,
     const std::string &description,
     const std::string &format_string,
@@ -61,7 +62,7 @@ Value VpaxValueFactory::CreateColumnValue(
     column_values.push_back(make_pair("IsHidden", Value::BOOLEAN(is_hidden)));
     column_values.push_back(make_pair("Encoding", Value(encoding)));
     column_values.push_back(make_pair("ColumnExpression", Value())); // NULL for data columns
-    column_values.push_back(make_pair("DisplayFolder", Value("")));
+    column_values.push_back(make_pair("DisplayFolder", Value(display_folder)));
     column_values.push_back(make_pair("Description", Value(description)));
     column_values.push_back(make_pair("FormatString", Value(format_string)));
     column_values.push_back(make_pair("EncodingHint", Value("")));
@@ -91,6 +92,7 @@ Value VpaxValueFactory::CreateMeasureValue(
     const std::string &data_type,
     const std::string &description,
     const std::string &format_string,
+    const std::string &display_folder,
     bool is_referenced) {
     
     child_list_t<Value> measure_values;
@@ -98,7 +100,7 @@ Value VpaxValueFactory::CreateMeasureValue(
     measure_values.push_back(make_pair("TableName", Value(table_name)));
     measure_values.push_back(make_pair("FullMeasureName", Value("[" + table_name + "].[" + measure_name + "]")));
     measure_values.push_back(make_pair("MeasureExpression", Value(expression)));
-    measure_values.push_back(make_pair("DisplayFolder", Value("")));
+    measure_values.push_back(make_pair("DisplayFolder", Value(display_folder)));
     measure_values.push_back(make_pair("Description", Value(description)));
     measure_values.push_back(make_pair("IsHidden", Value::BOOLEAN(is_hidden)));
     measure_values.push_back(make_pair("DataType", Value(data_type)));

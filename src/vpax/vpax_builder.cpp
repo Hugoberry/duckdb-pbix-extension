@@ -16,7 +16,7 @@ Value VpaxBuilder::BuildVpax() {
         // Build all sections
         auto tables = BuildTables();
         auto columns = BuildColumns();
-        // auto measures = BuildMeasures();
+        auto measures = BuildMeasures();
         // auto relationships = BuildRelationships();
         // auto segments = BuildColumnSegments();
         // auto column_hierarchies = BuildColumnHierarchies();
@@ -28,7 +28,7 @@ Value VpaxBuilder::BuildVpax() {
         child_list_t<Value> vpax_values;
         vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), vector<Value>(tables.begin(), tables.end()))));
         vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
-        // vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
+        vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
         // vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), vector<Value>(segments.begin(), segments.end()))));
         // vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
         // vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
@@ -125,16 +125,17 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
             c.isKey,
             c.isNullable,
             c.isUnique,
-            COALESCE(c.Description, '') as Description,
-            COALESCE(c.FormatString, '') as FormatString,
+            c.Description,
+            c.FormatString,
             COALESCE(cs.Statistics_DistinctStates,0) as Cardinality,
             666 as TotalSize,
-            666 as DictionarySize
+            666 as DictionarySize,
+            c.DisplayFolder
         FROM COLUMN c
         JOIN [Table] t ON c.TableId = t.ID
         LEFT JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
         LEFT JOIN DictionaryStorage ds ON cs.DictionaryStorageID = ds.ID
-        WHERE c.Type = 1  -- Data columns only
+        WHERE c.Type = 1 and t.systemflags = 0
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
@@ -151,6 +152,7 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
         int64_t cardinality = stmt.GetValue<int64_t>(9);
         int64_t total_size = stmt.GetValue<int64_t>(10);
         int64_t dictionary_size = stmt.GetValue<int64_t>(11);
+        std::string display_folder = stmt.GetValue<std::string>(12);
         
         std::string data_type = VpaxUtils::DataTypeIdToString(data_type_id);
         int64_t data_size = total_size - dictionary_size;
@@ -159,7 +161,7 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
         columns.push_back(VpaxValueFactory::CreateColumnValue(
             column_name, table_name, data_type, is_hidden, cardinality,
             total_size, dictionary_size, data_size, is_key, is_nullable,
-            is_unique, "Hash", description, format_string, selectivity
+            is_unique, display_folder, "Hash", description, format_string, selectivity
         ));
     }
     
@@ -173,13 +175,15 @@ std::vector<Value> VpaxBuilder::BuildMeasures() {
         SELECT 
             m.Name as MeasureName,
             t.Name as TableName,
-            COALESCE(m.Expression, '') as Expression,
+            m.Expression,
             m.isHidden,
             m.DataType,
-            COALESCE(m.Description, '') as Description,
-            COALESCE(m.FormatString, '') as FormatString
+            m.Description,
+            m.FormatString,
+            m.DisplayFolder
         FROM Measure m
         JOIN [Table] t ON m.TableID = t.ID
+        WHERE t.systemflags = 0
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
@@ -191,12 +195,13 @@ std::vector<Value> VpaxBuilder::BuildMeasures() {
         int data_type_id = stmt.GetValue<int>(4);
         std::string description = stmt.GetValue<std::string>(5);
         std::string format_string = stmt.GetValue<std::string>(6);
+        std::string display_folder = stmt.GetValue<std::string>(7);
         
         std::string data_type = VpaxUtils::DataTypeIdToString(data_type_id);
         
         measures.push_back(VpaxValueFactory::CreateMeasureValue(
             measure_name, table_name, expression, is_hidden,
-            data_type, description, format_string, false
+            data_type, description, format_string, display_folder, false
         ));
     }
     

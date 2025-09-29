@@ -53,6 +53,7 @@ public:
         bool is_key = false,
         bool is_nullable = true,
         bool is_unique = false,
+        const std::string &display_folder = "",
         const std::string &encoding = "Hash",
         const std::string &description = "",
         const std::string &format_string = "",
@@ -67,6 +68,7 @@ public:
         const std::string &data_type = "Variant",
         const std::string &description = "",
         const std::string &format_string = "",
+        const std::string &display_folder = "",
         bool is_referenced = false
     );
     
