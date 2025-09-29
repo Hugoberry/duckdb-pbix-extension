@@ -75,6 +75,11 @@ public:
         const std::string &description = "",
         const std::string &format_string = "",
         const std::string &display_folder = "",
+        const std::string &kpi_status = "",
+        const std::string &kpi_target = "",
+        const std::string &kpi_target_format = "",
+        const std::string &kpi_trend = "",
+        const std::string &detail_rows = "",
         bool is_referenced = false
     );
     

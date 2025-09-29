@@ -99,6 +99,11 @@ Value VpaxValueFactory::CreateMeasureValue(
     const std::string &description,
     const std::string &format_string,
     const std::string &display_folder,
+    const std::string &kpi_status,
+    const std::string &kpi_target,
+    const std::string &kpi_target_format,
+    const std::string &kpi_trend,
+    const std::string &detail_rows,
     bool is_referenced) {
     
     child_list_t<Value> measure_values;
@@ -110,12 +115,12 @@ Value VpaxValueFactory::CreateMeasureValue(
     measure_values.push_back(make_pair("Description", Value(description)));
     measure_values.push_back(make_pair("IsHidden", Value::BOOLEAN(is_hidden)));
     measure_values.push_back(make_pair("DataType", Value(data_type)));
-    measure_values.push_back(make_pair("DetailRowsExpression", Value())); // NULL
+    measure_values.push_back(make_pair("DetailRowsExpression", Value(detail_rows)));
     measure_values.push_back(make_pair("FormatString", Value(format_string)));
-    measure_values.push_back(make_pair("KpiStatusExpression", Value())); // NULL
-    measure_values.push_back(make_pair("KpiTargetExpression", Value())); // NULL
-    measure_values.push_back(make_pair("KpiTargetFormatString", Value())); // NULL
-    measure_values.push_back(make_pair("KpiTrendExpression", Value())); // NULL
+    measure_values.push_back(make_pair("KpiStatusExpression", Value(kpi_status)));
+    measure_values.push_back(make_pair("KpiTargetExpression", Value(kpi_target)));
+    measure_values.push_back(make_pair("KpiTargetFormatString", Value(kpi_target_format)));
+    measure_values.push_back(make_pair("KpiTrendExpression", Value(kpi_trend)));
     measure_values.push_back(make_pair("IsReferenced", Value::BOOLEAN(is_referenced)));
     
     return Value::STRUCT(measure_values);

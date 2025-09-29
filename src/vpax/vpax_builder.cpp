@@ -194,9 +194,16 @@ std::vector<Value> VpaxBuilder::BuildMeasures() {
             m.DataType,
             m.Description,
             m.FormatString,
-            m.DisplayFolder
+            m.DisplayFolder,
+            k.StatusExpression as KpiStatusExpression,
+            k.TargetExpression as KpiTargetExpression,
+            k.TargetFormatString as KpiTargetFormatString,
+            k.TrendExpression as KpiTrendExpression,
+            drd.Expression as DetailRowsExpression
         FROM Measure m
         JOIN [Table] t ON m.TableID = t.ID
+        LEFT JOIN KPI k on m.KPIID = k.ID
+        LEFT JOIN DetailRowsDefinition drd ON m.DetailRowsDefinitionID = drd.ID
         WHERE t.systemflags = 0
     )";
     
@@ -210,12 +217,18 @@ std::vector<Value> VpaxBuilder::BuildMeasures() {
         std::string description = stmt.GetValue<std::string>(5);
         std::string format_string = stmt.GetValue<std::string>(6);
         std::string display_folder = stmt.GetValue<std::string>(7);
+        std::string kpi_status = stmt.GetValue<std::string>(8);
+        std::string kpi_target = stmt.GetValue<std::string>(9);
+        std::string kpi_target_format = stmt.GetValue<std::string>(10);
+        std::string kpi_trend = stmt.GetValue<std::string>(11);
+        std::string detail_rows = stmt.GetValue<std::string>(12);
         
         std::string data_type = VpaxUtils::DataTypeIdToString(data_type_id);
         
         measures.push_back(VpaxValueFactory::CreateMeasureValue(
             measure_name, table_name, expression, is_hidden,
-            data_type, description, format_string, display_folder, false
+            data_type, description, format_string, display_folder,
+            kpi_status, kpi_target, kpi_target_format, kpi_trend, detail_rows, false
         ));
     }
     
