@@ -20,7 +20,7 @@ Value VpaxBuilder::BuildVpax() {
         // auto relationships = BuildRelationships();
         // auto segments = BuildColumnSegments();
         // auto column_hierarchies = BuildColumnHierarchies();
-        // auto user_hierarchies = BuildUserHierarchies();
+        auto user_hierarchies = BuildUserHierarchies();
         // auto table_permissions = BuildTablePermissions();
         // auto calc_items = BuildCalculationItems();
         
@@ -31,15 +31,12 @@ Value VpaxBuilder::BuildVpax() {
         vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
         // vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), vector<Value>(segments.begin(), segments.end()))));
         // vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
-        // vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
+        vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
         // vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
         // vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, vector<Value>(table_permissions.begin(), table_permissions.end()))));
         // vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, vector<Value>(calc_items.begin(), calc_items.end()))));
-        // vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), std::vector<Value>())));
-        vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
-        vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
@@ -326,9 +323,13 @@ std::vector<Value> VpaxBuilder::BuildUserHierarchies() {
             t.Name as TableName,
             h.Name as HierarchyName,
             h.isHidden,
-            COALESCE(h.UsedSize, 0) as UsedSize
+            666 as UsedSize,
+            (SELECT GROUP_CONCAT(l.Name, '|')
+            FROM Level l 
+            WHERE l.HierarchyID = h.id
+            ORDER BY l.Ordinal) as Levels
         FROM Hierarchy h
-        JOIN [Table] t ON h.TableID = t.ID
+        JOIN [Table] t ON h.TableID = t.ID;
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
@@ -337,35 +338,10 @@ std::vector<Value> VpaxBuilder::BuildUserHierarchies() {
         std::string hierarchy_name = stmt.GetValue<std::string>(1);
         bool is_hidden = stmt.GetValue<int>(2) != 0;
         int64_t used_size = stmt.GetValue<int64_t>(3);
-        
-        // Get hierarchy levels
-        std::string levels_sql = R"(
-            SELECT c.ExplicitName
-            FROM Level l
-            JOIN COLUMN c ON l.ColumnID = c.ID
-            JOIN Hierarchy h ON l.HierarchyID = h.ID
-            WHERE h.Name = ? AND h.TableID = (SELECT ID FROM [Table] WHERE Name = ?)
-            ORDER BY l.Ordinal
-        )";
-        
-        SQLiteStatement levels_stmt = db_.Prepare(levels_sql);
-        levels_stmt.BindText(0, string_t(hierarchy_name));
-        levels_stmt.BindText(1, string_t(table_name));
-        
-        std::vector<std::string> level_names;
-        while (levels_stmt.Step()) {
-            level_names.push_back(levels_stmt.GetValue<std::string>(0));
-        }
-        
-        // Build levels string manually
-        std::string levels_string = "";
-        for (size_t i = 0; i < level_names.size(); i++) {
-            if (i > 0) levels_string += ", ";
-            levels_string += level_names[i];
-        }
-        
+        std::string levels = stmt.GetValue<std::string>(4);
+
         hierarchies.push_back(VpaxValueFactory::CreateUserHierarchyValue(
-            table_name, hierarchy_name, is_hidden, used_size, levels_string
+            table_name, hierarchy_name, is_hidden, used_size, levels
         ));
     }
     
