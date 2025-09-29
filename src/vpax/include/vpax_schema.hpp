@@ -32,6 +32,7 @@ public:
         const std::string &table_name,
         int64_t row_count,
         bool is_hidden,
+        bool is_private = false,
         int64_t columns_size = 0,
         int64_t table_size = 0,
         int64_t relationships_size = 0,

@@ -7,6 +7,7 @@ Value VpaxValueFactory::CreateTableValue(
     const std::string &table_name,
     int64_t row_count,
     bool is_hidden,
+    bool is_private,
     int64_t columns_size,
     int64_t table_size,
     int64_t relationships_size,
@@ -20,7 +21,7 @@ Value VpaxValueFactory::CreateTableValue(
     table_values.push_back(make_pair("RowsCount", Value::BIGINT(row_count)));
     table_values.push_back(make_pair("ReferentialIntegrityViolationCount", Value::BIGINT(0)));
     table_values.push_back(make_pair("IsHidden", Value::BOOLEAN(is_hidden)));
-    table_values.push_back(make_pair("IsPrivate", Value::BOOLEAN(false)));
+    table_values.push_back(make_pair("IsPrivate", Value::BOOLEAN(is_private)));
     table_values.push_back(make_pair("IsLocalDateTable", Value::BOOLEAN(false)));
     table_values.push_back(make_pair("IsTemplateDateTable", Value::BOOLEAN(false)));
     table_values.push_back(make_pair("Description", Value(description)));

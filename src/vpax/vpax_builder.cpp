@@ -73,10 +73,19 @@ std::vector<Value> VpaxBuilder::BuildTables() {
     std::string sql = R"(
         SELECT 
             t.Name as TableName,
-            t.isHidden,
-            666 as RowsCount,
-            '' as Description
-        FROM [Table] t where ishidden = 0;
+            t.IsHidden,
+            cs.Statistics_DistinctStates as RowsCount,
+            t.IsPrivate,
+            t.DataCategory,
+            t.Description,
+            666 AS ColumnsSize,
+            666 AS TableSize,
+            666 AS RelationsSize,
+            666 AS UserHierarchiesSize
+        FROM [table] t
+        LEFT JOIN [Column] c on t.ID = C.TableID
+        LEFT JOIN [ColumnStorage] cs on c.ID = cs.ColumnID
+        WHERE t.systemflags = 0 and c.isKey = 1
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
@@ -84,7 +93,10 @@ std::vector<Value> VpaxBuilder::BuildTables() {
         std::string table_name = stmt.GetValue<std::string>(0);
         bool is_hidden = stmt.GetValue<int>(1) != 0;
         int64_t row_count = stmt.GetValue<int64_t>(2);
-        std::string description = stmt.GetValue<std::string>(3);
+        bool is_private = stmt.GetValue<int>(3) != 0;
+        std::string data_category = stmt.GetValue<std::string>(4);
+        std::string description = stmt.GetValue<std::string>(5);
+
         
         // Calculate sizes
         int64_t columns_size = CalculateTableSize(table_name);
@@ -93,7 +105,7 @@ std::vector<Value> VpaxBuilder::BuildTables() {
         bool is_referenced = VpaxUtils::CheckIfTableIsReferenced(db_, table_name);
         
         tables.push_back(VpaxValueFactory::CreateTableValue(
-            table_name, row_count, is_hidden, columns_size, 
+            table_name, row_count, is_hidden, is_private, columns_size,
             table_size, rel_size, 0, is_referenced, description
         ));
     }
