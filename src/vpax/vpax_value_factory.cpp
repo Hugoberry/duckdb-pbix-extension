@@ -13,13 +13,14 @@ Value VpaxValueFactory::CreateTableValue(
     int64_t relationships_size,
     int64_t hierarchies_size,
     bool is_referenced,
+    int64_t ri_violation_count,
     const std::string &description) {
     
     child_list_t<Value> table_values;
     table_values.push_back(make_pair("TableName", Value(table_name)));
     table_values.push_back(make_pair("TableExpression", Value())); // NULL
     table_values.push_back(make_pair("RowsCount", Value::BIGINT(row_count)));
-    table_values.push_back(make_pair("ReferentialIntegrityViolationCount", Value::BIGINT(0)));
+    table_values.push_back(make_pair("ReferentialIntegrityViolationCount", Value::BIGINT(ri_violation_count)));
     table_values.push_back(make_pair("IsHidden", Value::BOOLEAN(is_hidden)));
     table_values.push_back(make_pair("IsPrivate", Value::BOOLEAN(is_private)));
     table_values.push_back(make_pair("IsLocalDateTable", Value::BOOLEAN(false)));
@@ -46,10 +47,15 @@ Value VpaxValueFactory::CreateColumnValue(
     bool is_key,
     bool is_nullable,
     bool is_unique,
+    bool keep_unique_rows,
+    bool is_available_in_mdx,
     const std::string &display_folder,
     const std::string &encoding,
     const std::string &description,
+    const std::string &expression,
     const std::string &format_string,
+    const std::string &encoding_hint,
+    const std::string &state,
     double selectivity) {
     
     child_list_t<Value> column_values;
@@ -61,18 +67,18 @@ Value VpaxValueFactory::CreateColumnValue(
     column_values.push_back(make_pair("ColumnType", Value("Data")));
     column_values.push_back(make_pair("IsHidden", Value::BOOLEAN(is_hidden)));
     column_values.push_back(make_pair("Encoding", Value(encoding)));
-    column_values.push_back(make_pair("ColumnExpression", Value())); // NULL for data columns
+    column_values.push_back(make_pair("ColumnExpression", Value(expression)));
     column_values.push_back(make_pair("DisplayFolder", Value(display_folder)));
     column_values.push_back(make_pair("Description", Value(description)));
     column_values.push_back(make_pair("FormatString", Value(format_string)));
-    column_values.push_back(make_pair("EncodingHint", Value("")));
-    column_values.push_back(make_pair("IsAvailableInMDX", Value::BOOLEAN(true)));
+    column_values.push_back(make_pair("EncodingHint", Value(encoding_hint)));
+    column_values.push_back(make_pair("IsAvailableInMDX", Value::BOOLEAN(is_available_in_mdx)));
     column_values.push_back(make_pair("IsKey", Value::BOOLEAN(is_key)));
     column_values.push_back(make_pair("IsNullable", Value::BOOLEAN(is_nullable)));
     column_values.push_back(make_pair("IsUnique", Value::BOOLEAN(is_unique)));
-    column_values.push_back(make_pair("KeepUniqueRows", Value::BOOLEAN(false)));
+    column_values.push_back(make_pair("KeepUniqueRows", Value::BOOLEAN(keep_unique_rows)));
     column_values.push_back(make_pair("SortByColumnName", Value("")));
-    column_values.push_back(make_pair("State", Value("Ready")));
+    column_values.push_back(make_pair("State", Value(state)));
     column_values.push_back(make_pair("IsRowNumber", Value::BOOLEAN(false)));
     column_values.push_back(make_pair("IsReferenced", Value::BOOLEAN(false))); // TODO: Implement
     column_values.push_back(make_pair("DictionarySize", Value::BIGINT(dictionary_size)));

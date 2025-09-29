@@ -78,6 +78,7 @@ std::vector<Value> VpaxBuilder::BuildTables() {
             t.IsPrivate,
             t.DataCategory,
             t.Description,
+            ts.RIViolationCount,
             666 AS ColumnsSize,
             666 AS TableSize,
             666 AS RelationsSize,
@@ -85,6 +86,7 @@ std::vector<Value> VpaxBuilder::BuildTables() {
         FROM [table] t
         LEFT JOIN [Column] c on t.ID = C.TableID
         LEFT JOIN [ColumnStorage] cs on c.ID = cs.ColumnID
+        LEFT JOIN [TableStorage] ts on c.TableID = ts.TableID
         WHERE t.systemflags = 0 and c.isKey = 1
     )";
     
@@ -96,6 +98,7 @@ std::vector<Value> VpaxBuilder::BuildTables() {
         bool is_private = stmt.GetValue<int>(3) != 0;
         std::string data_category = stmt.GetValue<std::string>(4);
         std::string description = stmt.GetValue<std::string>(5);
+        int64_t ri_violation_count = stmt.GetValue<int64_t>(6);
 
         
         // Calculate sizes
@@ -106,7 +109,7 @@ std::vector<Value> VpaxBuilder::BuildTables() {
         
         tables.push_back(VpaxValueFactory::CreateTableValue(
             table_name, row_count, is_hidden, is_private, columns_size,
-            table_size, rel_size, 0, is_referenced, description
+            table_size, rel_size, 0, is_referenced, ri_violation_count, description
         ));
     }
     
@@ -130,12 +133,17 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
             COALESCE(cs.Statistics_DistinctStates,0) as Cardinality,
             666 as TotalSize,
             666 as DictionarySize,
-            c.DisplayFolder
+            c.DisplayFolder,
+            c.Expression,
+            CAST(c.EncodingHint as VARCHAR) as EncodingHint,
+            c.KeepUniqueRows,
+            CAST(c.State as VARCHAR) as State,
+            c.IsAvailableInMDX
         FROM COLUMN c
         JOIN [Table] t ON c.TableId = t.ID
         LEFT JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
         LEFT JOIN DictionaryStorage ds ON cs.DictionaryStorageID = ds.ID
-        WHERE c.Type = 1 and t.systemflags = 0
+        WHERE c.Type IN (1,2) and t.systemflags = 0
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
@@ -153,7 +161,12 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
         int64_t total_size = stmt.GetValue<int64_t>(10);
         int64_t dictionary_size = stmt.GetValue<int64_t>(11);
         std::string display_folder = stmt.GetValue<std::string>(12);
-        
+        std::string expression = stmt.GetValue<std::string>(13);
+        std::string encoding_hint = stmt.GetValue<std::string>(14);
+        bool keep_unique_rows = stmt.GetValue<int>(15) != 0;
+        std::string state = stmt.GetValue<std::string>(16);
+        bool is_available_in_mdx = stmt.GetValue<int>(17) != 0;
+
         std::string data_type = VpaxUtils::DataTypeIdToString(data_type_id);
         int64_t data_size = total_size - dictionary_size;
         double selectivity = CalculateSelectivity(table_name, column_name);
@@ -161,7 +174,8 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
         columns.push_back(VpaxValueFactory::CreateColumnValue(
             column_name, table_name, data_type, is_hidden, cardinality,
             total_size, dictionary_size, data_size, is_key, is_nullable,
-            is_unique, display_folder, "Hash", description, format_string, selectivity
+            is_unique, keep_unique_rows, is_available_in_mdx, display_folder, "Hash", description,
+            expression, format_string, encoding_hint, state, selectivity
         ));
     }
     

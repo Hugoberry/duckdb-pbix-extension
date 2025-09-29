@@ -38,6 +38,7 @@ public:
         int64_t relationships_size = 0,
         int64_t hierarchies_size = 0,
         bool is_referenced = false,
+        int64_t ri_violation_count = 0,
         const std::string &description = ""
     );
     
@@ -53,10 +54,15 @@ public:
         bool is_key = false,
         bool is_nullable = true,
         bool is_unique = false,
+        bool keep_unique_rows = false,
+        bool is_available_in_mdx = true,
         const std::string &display_folder = "",
         const std::string &encoding = "Hash",
         const std::string &description = "",
+        const std::string &expression = "",
         const std::string &format_string = "",
+        const std::string &encoding_hint = "",
+        const std::string &state = "",
         double selectivity = 0.0
     );
     
