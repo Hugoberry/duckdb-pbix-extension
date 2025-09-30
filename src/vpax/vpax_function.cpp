@@ -31,7 +31,7 @@ void VpaxFunction::Execute(DataChunk &args, ExpressionState &state, Vector &resu
             db = SQLiteDB::OpenFromBuffer(options, dataModel.metadata_db);
             
             // Build VPAX structure
-            VpaxBuilder builder(db, file_name);
+            VpaxBuilder builder(db, file_name, dataModel.vertipaq_files);
             Value vpax_result = builder.BuildVpax();
             
             // Set result

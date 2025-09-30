@@ -7,8 +7,18 @@
 
 using namespace duckdb;
 
-VpaxBuilder::VpaxBuilder(SQLiteDB &db, const std::string &file_name) 
+VpaxBuilder::VpaxBuilder(SQLiteDB &db, const std::string &file_name,
+                         const std::vector<VertipaqFile> &vertipaq_files) 
     : db_(db), file_name_(file_name) {
+    // Build file size map for quick lookup
+    for (const auto &vfile : vertipaq_files) {
+        file_size_map_[vfile.FileName] = vfile.Size;
+    }        
+}
+
+int64_t VpaxBuilder::GetFileSizeByName(const std::string &filename) {
+    auto it = file_size_map_.find(filename);
+    return (it != file_size_map_.end()) ? it->second : 0;
 }
 
 Value VpaxBuilder::BuildVpax() {
@@ -74,11 +84,7 @@ std::vector<Value> VpaxBuilder::BuildTables() {
             t.IsPrivate,
             t.DataCategory,
             t.Description,
-            ts.RIViolationCount,
-            666 AS ColumnsSize,
-            666 AS TableSize,
-            666 AS RelationsSize,
-            666 AS UserHierarchiesSize
+            ts.RIViolationCount
         FROM [table] t
         LEFT JOIN [Column] c on t.ID = C.TableID
         LEFT JOIN [ColumnStorage] cs on c.ID = cs.ColumnID
@@ -95,21 +101,71 @@ std::vector<Value> VpaxBuilder::BuildTables() {
         std::string data_category = stmt.GetValue<std::string>(4);
         std::string description = stmt.GetValue<std::string>(5);
         int64_t ri_violation_count = stmt.GetValue<int64_t>(6);
-
         
-        // Calculate sizes
-        int64_t columns_size = CalculateTableSize(table_name);
-        int64_t table_size = columns_size; // For now, same as columns size
+        // Calculate actual sizes
+        int64_t columns_size = CalculateTableColumnsSize(table_name);
+        int64_t hierarchies_size = CalculateTableHierarchiesSize(table_name);
+        int64_t table_size = columns_size + hierarchies_size;
         int64_t rel_size = CalculateRelationshipSize(table_name, "");
         bool is_referenced = VpaxUtils::CheckIfTableIsReferenced(db_, table_name);
         
         tables.push_back(VpaxValueFactory::CreateTableValue(
             table_name, row_count, is_hidden, is_private, columns_size,
-            table_size, rel_size, 0, is_referenced, ri_violation_count, description
+            table_size, rel_size, hierarchies_size, is_referenced, ri_violation_count, description
         ));
     }
     
     return tables;
+}
+
+int64_t VpaxBuilder::CalculateTableColumnsSize(const std::string &table_name) {
+    std::string sql = R"(
+        SELECT 
+            sfd.FileName AS DictionaryFileName,
+            sfi.FileName AS IDFFileName
+        FROM COLUMN c
+        JOIN [Table] t ON c.TableId = t.ID
+        JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
+        LEFT JOIN DictionaryStorage ds ON cs.DictionaryStorageID = ds.ID
+        LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
+        LEFT JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
+        LEFT JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
+        WHERE t.Name = ? AND c.Type IN (1,2)
+    )";
+    
+    SQLiteStatement stmt = db_.Prepare(sql);
+    stmt.BindText(0, string_t(table_name));
+    
+    int64_t total = 0;
+    while (stmt.Step()) {
+        std::string dict_filename = stmt.GetValue<std::string>(0);
+        std::string idf_filename = stmt.GetValue<std::string>(1);
+        total += GetFileSizeByName(dict_filename);
+        total += GetFileSizeByName(idf_filename);
+    }
+    return total;
+}
+
+int64_t VpaxBuilder::CalculateTableHierarchiesSize(const std::string &table_name) {
+    std::string sql = R"(
+        SELECT sfh.FileName AS HIDXFileName
+        FROM COLUMN c
+        JOIN [Table] t ON c.TableId = t.ID
+        LEFT JOIN AttributeHierarchy ah ON ah.ColumnID = c.ID
+        LEFT JOIN AttributeHierarchyStorage ahs ON ah.AttributeHierarchyStorageID = ahs.ID
+        LEFT JOIN StorageFile sfh ON sfh.ID = ahs.StorageFileID
+        WHERE t.Name = ? AND c.Type IN (1,2)
+    )";
+    
+    SQLiteStatement stmt = db_.Prepare(sql);
+    stmt.BindText(0, string_t(table_name));
+    
+    int64_t total = 0;
+    while (stmt.Step()) {
+        std::string hidx_filename = stmt.GetValue<std::string>(0);
+        total += GetFileSizeByName(hidx_filename);
+    }
+    return total;
 }
 
 std::vector<Value> VpaxBuilder::BuildColumns() {
@@ -127,19 +183,30 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
             c.Description,
             c.FormatString,
             COALESCE(cs.Statistics_DistinctStates,0) as Cardinality,
-            666 as TotalSize,
-            666 as DictionarySize,
             c.DisplayFolder,
             c.Expression,
             CAST(c.EncodingHint as VARCHAR) as EncodingHint,
             c.KeepUniqueRows,
             CAST(c.State as VARCHAR) as State,
-            c.IsAvailableInMDX
+            c.IsAvailableInMDX,
+            sfd.FileName AS DictionaryFileName,
+            sfh.FileName AS HIDXFileName,
+            sfi.FileName AS IDFFileName
         FROM COLUMN c
         JOIN [Table] t ON c.TableId = t.ID
-        LEFT JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
+        JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
+        -- HIDX (Hash Index)
+        LEFT JOIN AttributeHierarchy ah ON ah.ColumnID = c.ID
+        LEFT JOIN AttributeHierarchyStorage ahs ON ah.AttributeHierarchyStorageID = ahs.ID
+        LEFT JOIN StorageFile sfh ON sfh.ID = ahs.StorageFileID
+        -- Dictionary
         LEFT JOIN DictionaryStorage ds ON cs.DictionaryStorageID = ds.ID
+        LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
+        -- IDF (Index/Data File)
+        LEFT JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
+        LEFT JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
         WHERE c.Type IN (1,2) and t.systemflags = 0
+        ORDER BY t.Name, cs.StoragePosition
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
@@ -154,17 +221,25 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
         std::string description = stmt.GetValue<std::string>(7);
         std::string format_string = stmt.GetValue<std::string>(8);
         int64_t cardinality = stmt.GetValue<int64_t>(9);
-        int64_t total_size = stmt.GetValue<int64_t>(10);
-        int64_t dictionary_size = stmt.GetValue<int64_t>(11);
-        std::string display_folder = stmt.GetValue<std::string>(12);
-        std::string expression = stmt.GetValue<std::string>(13);
-        std::string encoding_hint = stmt.GetValue<std::string>(14);
-        bool keep_unique_rows = stmt.GetValue<int>(15) != 0;
-        std::string state = stmt.GetValue<std::string>(16);
-        bool is_available_in_mdx = stmt.GetValue<int>(17) != 0;
+        std::string display_folder = stmt.GetValue<std::string>(10);
+        std::string expression = stmt.GetValue<std::string>(11);
+        std::string encoding_hint = stmt.GetValue<std::string>(12);
+        bool keep_unique_rows = stmt.GetValue<int>(13) != 0;
+        std::string state = stmt.GetValue<std::string>(14);
+        bool is_available_in_mdx = stmt.GetValue<int>(15) != 0;
+        std::string dict_filename = stmt.GetValue<std::string>(16);
+        std::string hidx_filename = stmt.GetValue<std::string>(17);
+        std::string idf_filename = stmt.GetValue<std::string>(18);
 
         std::string data_type = VpaxUtils::DataTypeIdToString(data_type_id);
-        int64_t data_size = total_size - dictionary_size;
+        
+        // Calculate actual sizes from file log
+        int64_t dictionary_size = GetFileSizeByName(dict_filename);
+        int64_t hidx_size = GetFileSizeByName(hidx_filename);
+        int64_t data_size = GetFileSizeByName(idf_filename);
+        int64_t total_size = dictionary_size + data_size;
+        int64_t hierarchies_size = hidx_size;
+        
         double selectivity = CalculateSelectivity(table_name, column_name);
         
         columns.push_back(VpaxValueFactory::CreateColumnValue(

@@ -3,6 +3,8 @@
 #include "duckdb.hpp"
 #include "sqlite_db.hpp"
 #include "vpax_types.hpp"
+#include "vertipaq_meta.hpp"
+#include <unordered_map>
 #include <vector>
 
 namespace duckdb {
@@ -15,9 +17,11 @@ class VpaxBuilder {
 private:
     SQLiteDB &db_;
     std::string file_name_;
+    std::unordered_map<std::string, int64_t> file_size_map_;
     
 public:
-    VpaxBuilder(SQLiteDB &db, const std::string &file_name);
+    VpaxBuilder(SQLiteDB &db, const std::string &file_name,
+               const std::vector<VertipaqFile> &vertipaq_files);
     ~VpaxBuilder() = default;
     
     // Main build function
@@ -36,6 +40,9 @@ public:
     
 private:
     // Helper functions
+    int64_t GetFileSizeByName(const std::string &filename);
+    int64_t CalculateTableColumnsSize(const std::string &table_name);
+    int64_t CalculateTableHierarchiesSize(const std::string &table_name);
     int64_t CalculateTableSize(const std::string &table_name);
     int64_t CalculateColumnSize(const std::string &table_name, const std::string &column_name);
     int64_t CalculateRelationshipSize(const std::string &from_table, const std::string &to_table);
