@@ -43,8 +43,6 @@ private:
     int64_t GetFileSizeByName(const std::string &filename);
     int64_t CalculateTableColumnsSize(const std::string &table_name);
     int64_t CalculateTableHierarchiesSize(const std::string &table_name);
-    int64_t CalculateTableSize(const std::string &table_name);
-    int64_t CalculateColumnSize(const std::string &table_name, const std::string &column_name);
     int64_t CalculateRelationshipSize(const std::string &from_table, const std::string &to_table);
     double CalculateSelectivity(const std::string &table_name, const std::string &column_name);
     

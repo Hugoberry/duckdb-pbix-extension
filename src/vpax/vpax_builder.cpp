@@ -487,30 +487,6 @@ std::vector<Value> VpaxBuilder::BuildCalculationItems() {
     return std::vector<Value>();
 }
 
-// Helper implementations
-int64_t VpaxBuilder::CalculateTableSize(const std::string &table_name) {
-    std::string sql = R"(
-        SELECT 666
-        FROM COLUMN c
-        JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
-        JOIN [Table] t ON c.TableId = t.ID
-        WHERE t.Name = ? AND c.Type = 1
-    )";
-    
-    SQLiteStatement stmt = db_.Prepare(sql);
-    stmt.BindText(0, string_t(table_name));
-    
-    if (stmt.Step()) {
-        return stmt.GetValue<int64_t>(0);
-    }
-    return 0;
-}
-
-int64_t VpaxBuilder::CalculateColumnSize(const std::string &table_name, const std::string &column_name) {
-    // Implementation would depend on storage metadata availability
-    return 0;
-}
-
 int64_t VpaxBuilder::CalculateRelationshipSize(const std::string &from_table, const std::string &to_table) {
     // Implementation would depend on relationship storage metadata
     return 0;
