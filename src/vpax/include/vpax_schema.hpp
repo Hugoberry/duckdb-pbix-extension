@@ -128,6 +128,13 @@ public:
         int64_t used_size = 0,
         const std::string &levels = ""
     );
+
+    static Value CreateColumnHierarchyValue(
+        const std::string &column_name,
+        const std::string &table_name,
+        const std::string &structure_name,
+        int64_t used_size = 0
+    );
     
     // Error value
     static Value CreateErrorValue(

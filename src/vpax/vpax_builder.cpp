@@ -29,7 +29,7 @@ Value VpaxBuilder::BuildVpax() {
         auto measures = BuildMeasures();
         auto relationships = BuildRelationships();
         // auto segments = BuildColumnSegments();
-        // auto column_hierarchies = BuildColumnHierarchies();
+        auto column_hierarchies = BuildColumnHierarchies();
         auto user_hierarchies = BuildUserHierarchies();
         // auto table_permissions = BuildTablePermissions();
         // auto calc_items = BuildCalculationItems();
@@ -40,13 +40,12 @@ Value VpaxBuilder::BuildVpax() {
         vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
         vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
         // vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), vector<Value>(segments.begin(), segments.end()))));
-        // vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
+        vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
         vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
         vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
         // vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, vector<Value>(table_permissions.begin(), table_permissions.end()))));
         // vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, vector<Value>(calc_items.begin(), calc_items.end()))));
         vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
-        vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         
@@ -554,8 +553,41 @@ std::vector<Value> VpaxBuilder::BuildColumnSegments() {
 }
 
 std::vector<Value> VpaxBuilder::BuildColumnHierarchies() {
-    // TODO: Implement when hierarchy metadata is available
-    return std::vector<Value>();
+    std::vector<Value> hierarchies;
+
+    std::string sql = R"(
+        SELECT DISTINCT  
+            t.Name as TableName,
+            c.ExplicitName as ColumnName, 
+            sc.ExplicitName as StructureName,
+            sfi.FileName
+        FROM COLUMN c
+        JOIN [Table] t 
+            ON c.TableId = t.ID
+        JOIN AttributeHierarchy ah 
+            ON ah.ColumnID = c.ID
+        JOIN AttributeHierarchyStorage ahs 
+            ON ah.AttributeHierarchyStorageID = ahs.ID
+        join Column sc 
+            on ahs.SystemTableID = sc.TableID
+        JOIN ColumnPartitionStorage cps 
+            ON cps.ColumnStorageID = sc.ColumnStorageID
+        JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
+    )";
+
+    SQLiteStatement stmt = db_.Prepare(sql);
+    while (stmt.Step()) {
+        std::string table_name = stmt.GetValue<std::string>(0);
+        std::string column_name = stmt.GetValue<std::string>(1);
+        std::string structure_name = stmt.GetValue<std::string>(2);
+        std::string hidx_filename = stmt.GetValue<std::string>(3);
+        int64_t hierarchy_size = GetFileSizeByName(hidx_filename);
+        hierarchies.push_back(VpaxValueFactory::CreateColumnHierarchyValue(
+            table_name, column_name, structure_name, hierarchy_size
+        ));
+    }
+
+    return hierarchies;
 }
 
 std::vector<Value> VpaxBuilder::BuildUserHierarchies() {

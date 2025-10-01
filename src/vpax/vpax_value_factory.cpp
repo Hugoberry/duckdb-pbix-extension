@@ -230,6 +230,22 @@ Value VpaxValueFactory::CreateUserHierarchyValue(
     return Value::STRUCT(hierarchy_values);
 }
 
+Value VpaxValueFactory::CreateColumnHierarchyValue(
+    const std::string &table_name,
+    const std::string &column_name,
+    const std::string &structure_name,
+    int64_t hierarchy_size) {
+    
+    child_list_t<Value> hierarchy_values;
+    hierarchy_values.push_back(make_pair("TableName", Value(table_name)));
+    hierarchy_values.push_back(make_pair("ColumnName", Value(column_name)));
+    hierarchy_values.push_back(make_pair("FullColumnName", Value(table_name + "[" + column_name + "]")));
+    hierarchy_values.push_back(make_pair("StructureName", Value(structure_name)));
+    hierarchy_values.push_back(make_pair("UsedSize", Value::BIGINT(hierarchy_size)));
+    
+    return Value::STRUCT(hierarchy_values);
+}
+
 Value VpaxValueFactory::CreateErrorValue(
     const std::string &message,
     const std::string &file_name,
