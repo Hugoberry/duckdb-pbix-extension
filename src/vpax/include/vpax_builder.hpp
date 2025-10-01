@@ -9,8 +9,31 @@
 
 namespace duckdb {
 
-// Forward declarations
 class SQLiteDB;
+
+// Structure to hold pre-fetched data
+struct PreFetchedData {
+    // Table files: table_id -> list of filenames
+    std::unordered_map<int, std::vector<std::string>> table_files;
+    
+    // Dictionary sizes: column_id -> dictionary size
+    std::unordered_map<int, int64_t> dictionary_sizes;
+    
+    // Column files: column_id -> filename
+    std::unordered_map<int, std::string> column_files;
+    
+    // Table hierarchies files: table_id -> list of filenames
+    std::unordered_map<int, std::vector<std::string>> table_hierarchy_files;
+    
+    // Column hierarchy files: column_id -> list of filenames
+    std::unordered_map<int, std::vector<std::string>> column_hierarchy_files;
+    
+    // User hierarchy files: hierarchy_id -> list of filenames
+    std::unordered_map<int, std::vector<std::string>> user_hierarchy_files;
+    
+    // Relationship counts: from_table_name -> count
+    std::unordered_map<std::string, int> relationship_counts;
+};
 
 // Main VPAX Builder class
 class VpaxBuilder {
@@ -27,25 +50,28 @@ public:
     // Main build function
     Value BuildVpax();
     
-    // Section builders
-    std::vector<Value> BuildTables();
-    std::vector<Value> BuildColumns();
+    // Pre-fetch all data
+    void PreFetchData(PreFetchedData &data);
+    
+    // Section builders (updated to use pre-fetched data)
+    std::vector<Value> BuildTables(const PreFetchedData &prefetched);
+    std::vector<Value> BuildColumns(const PreFetchedData &prefetched);
     std::vector<Value> BuildMeasures();
     std::vector<Value> BuildRelationships();
     std::vector<Value> BuildColumnSegments();
     std::vector<Value> BuildColumnHierarchies();
-    std::vector<Value> BuildUserHierarchies();
+    std::vector<Value> BuildUserHierarchies(const PreFetchedData &prefetched);
     std::vector<Value> BuildPartitions();
-    std::vector<Value> BuildTablePermissions();  // Empty for now
-    std::vector<Value> BuildCalculationItems();  // Empty for now
+    std::vector<Value> BuildTablePermissions();
+    std::vector<Value> BuildCalculationItems();
     
 private:
-    // Helper functions
+    // Helper functions (updated to use pre-fetched data)
     int64_t GetFileSizeByName(const std::string &filename);
-    int64_t CalculateTableColumnsSize(int table_id);
-    int64_t CalculateTableHierarchiesSize(int table_id);
-    int64_t CalculateColumnHierarchySize(int table_id, int column_id);
-    int64_t CalculateUserHierarchySize(int hierarchy_id);
+    int64_t CalculateTableColumnsSize(int table_id, const PreFetchedData &prefetched);
+    int64_t CalculateTableHierarchiesSize(int table_id, const PreFetchedData &prefetched);
+    int64_t CalculateColumnHierarchySize(int column_id, const PreFetchedData &prefetched);
+    int64_t CalculateUserHierarchySize(int hierarchy_id, const PreFetchedData &prefetched);
     int64_t CalculateRelationshipSize(const std::string &from_table, const std::string &to_table);
     double CalculateSelectivity(const std::string &table_name, const std::string &column_name);
     
@@ -56,17 +82,12 @@ private:
 // VPAX Function Registration
 class VpaxFunction {
 public:
-    // Main scalar function implementation
     static void Execute(DataChunk &args, ExpressionState &state, Vector &result);
-    
-    // Function binding
     static unique_ptr<FunctionData> Bind(
         ClientContext &context, 
         ScalarFunction &bound_function,
         vector<unique_ptr<Expression>> &arguments
     );
-    
-    // Register with DuckDB
     static void Register(ExtensionLoader &loader);
 };
 

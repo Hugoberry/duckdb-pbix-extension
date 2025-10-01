@@ -21,43 +21,203 @@ int64_t VpaxBuilder::GetFileSizeByName(const std::string &filename) {
     return (it != file_size_map_.end()) ? it->second : 0;
 }
 
+void VpaxBuilder::PreFetchData(PreFetchedData &data) {
+    // 1. Pre-fetch all table files in one query
+    std::string table_files_sql = R"(
+        WITH TableFiles AS (
+            SELECT 
+                t.ID as TableID,
+                ps.StorageFolderID AS FolderID
+            FROM [Table] t
+            INNER JOIN [Partition] p ON p.tableid = t.id
+            INNER JOIN PartitionStorage ps ON ps.partitionid = p.ID
+            WHERE t.systemflags = 0
+            
+            UNION
+            
+            SELECT 
+                t.ID as TableID,
+                sf.ID as FolderID
+            FROM COLUMN c
+            INNER JOIN [Table] t ON c.TableId = t.ID
+            INNER JOIN AttributeHierarchy ah ON ah.ColumnID = c.ID
+            INNER JOIN AttributeHierarchyStorage ahs ON ah.AttributeHierarchyStorageID = ahs.ID
+            INNER JOIN [Table] st ON st.id = ahs.SystemTableID
+            INNER JOIN [Partition] p ON p.tableid = st.id
+            INNER JOIN PartitionStorage ps ON ps.partitionid = p.id
+            INNER JOIN StorageFolder sf ON sf.ID = ps.StorageFolderID
+            WHERE t.systemflags = 0
+        )
+        SELECT DISTINCT
+            tf.TableID,
+            sff.FileName
+        FROM TableFiles tf
+        INNER JOIN StorageFile sff ON sff.StorageFolderID = tf.FolderID
+    )";
+    
+    SQLiteStatement stmt = db_.Prepare(table_files_sql);
+    while (stmt.Step()) {
+        int table_id = stmt.GetValue<int>(0);
+        std::string filename = stmt.GetValue<std::string>(1);
+        data.table_files[table_id].push_back(filename);
+    }
+    
+    // 2. Pre-fetch all dictionary sizes in one query
+    std::string dict_sizes_sql = R"(
+        SELECT 
+            c.ID as ColumnID,
+            COALESCE(ds.Size, 0) as DictSize
+        FROM column c
+        LEFT JOIN ColumnStorage cs ON c.id = cs.ColumnID
+        LEFT JOIN DictionaryStorage ds ON ds.ColumnStorageID = cs.ID
+        WHERE c.Type = 1
+    )";
+    
+    stmt = db_.Prepare(dict_sizes_sql);
+    while (stmt.Step()) {
+        int column_id = stmt.GetValue<int>(0);
+        int64_t dict_size = stmt.GetValue<int64_t>(1);
+        data.dictionary_sizes[column_id] = dict_size;
+    }
+    
+    // 3. Pre-fetch all column IDF files in one query
+    std::string column_files_sql = R"(
+        SELECT 
+            c.ID as ColumnID,
+            sfi.FileName AS IDFFileName
+        FROM COLUMN c
+        JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
+        LEFT JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
+        LEFT JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
+        WHERE c.Type = 1 AND sfi.FileName IS NOT NULL
+    )";
+    
+    stmt = db_.Prepare(column_files_sql);
+    while (stmt.Step()) {
+        int column_id = stmt.GetValue<int>(0);
+        std::string filename = stmt.GetValue<std::string>(1);
+        data.column_files[column_id] = filename;
+    }
+    
+    // 4. Pre-fetch table hierarchy files
+    std::string table_hier_sql = R"(
+        SELECT DISTINCT 
+            t.ID as TableID,
+            sff.FileName
+        FROM Hierarchy h
+        INNER JOIN [Table] t ON h.TableID = t.ID
+        INNER JOIN HierarchyStorage hs ON hs.HierarchyID = h.id
+        INNER JOIN [Table] st ON st.id = hs.SystemTableID
+        INNER JOIN [Partition] p ON p.tableid = st.id
+        INNER JOIN PartitionStorage ps ON ps.partitionid = p.id
+        INNER JOIN StorageFolder sf ON sf.ID = ps.StorageFolderID
+        INNER JOIN StorageFile sff ON sf.id = sff.StorageFolderID
+        WHERE t.systemflags = 0
+    )";
+    
+    stmt = db_.Prepare(table_hier_sql);
+    while (stmt.Step()) {
+        int table_id = stmt.GetValue<int>(0);
+        std::string filename = stmt.GetValue<std::string>(1);
+        data.table_hierarchy_files[table_id].push_back(filename);
+    }
+    
+    // 5. Pre-fetch column hierarchy files
+    std::string col_hier_sql = R"(
+        SELECT DISTINCT 
+            c.ID as ColumnID,
+            sff.FileName
+        FROM COLUMN c
+        INNER JOIN [Table] t ON c.TableId = t.ID
+        INNER JOIN AttributeHierarchy ah ON ah.ColumnID = c.ID
+        INNER JOIN AttributeHierarchyStorage ahs ON ah.AttributeHierarchyStorageID = ahs.ID
+        INNER JOIN [Table] st ON st.id = ahs.SystemTableID
+        INNER JOIN [Partition] p ON p.tableid = st.id
+        INNER JOIN PartitionStorage ps ON ps.partitionid = p.id
+        INNER JOIN StorageFolder sf ON sf.ID = ps.StorageFolderID
+        INNER JOIN StorageFile sff ON sf.id = sff.StorageFolderID
+        WHERE t.systemflags = 0
+    )";
+    
+    stmt = db_.Prepare(col_hier_sql);
+    while (stmt.Step()) {
+        int column_id = stmt.GetValue<int>(0);
+        std::string filename = stmt.GetValue<std::string>(1);
+        data.column_hierarchy_files[column_id].push_back(filename);
+    }
+    
+    // 6. Pre-fetch user hierarchy files
+    std::string user_hier_sql = R"(
+        SELECT DISTINCT 
+            h.ID as HierarchyID,
+            sff.FileName
+        FROM Hierarchy h
+        INNER JOIN HierarchyStorage hs ON hs.HierarchyID = h.id
+        INNER JOIN [Table] st ON st.id = hs.SystemTableID
+        INNER JOIN [Partition] p ON p.tableid = st.id
+        INNER JOIN PartitionStorage ps ON ps.partitionid = p.id
+        INNER JOIN StorageFolder sf ON sf.ID = ps.StorageFolderID
+        INNER JOIN StorageFile sff ON sf.id = sff.StorageFolderID
+    )";
+    
+    stmt = db_.Prepare(user_hier_sql);
+    while (stmt.Step()) {
+        int hierarchy_id = stmt.GetValue<int>(0);
+        std::string filename = stmt.GetValue<std::string>(1);
+        data.user_hierarchy_files[hierarchy_id].push_back(filename);
+    }
+    
+    // 7. Pre-fetch relationship counts per table
+    std::string rel_count_sql = R"(
+        SELECT 
+            tt.Name as TableName,
+            COUNT(*) as RelCount
+        FROM Relationship r
+        JOIN COLUMN ct ON r.ToColumnID = ct.ID
+        JOIN [Table] tt ON ct.TableId = tt.ID
+        WHERE tt.systemflags = 0
+        GROUP BY tt.Name
+    )";
+    
+    stmt = db_.Prepare(rel_count_sql);
+    while (stmt.Step()) {
+        std::string table_name = stmt.GetValue<std::string>(0);
+        int count = stmt.GetValue<int>(1);
+        data.relationship_counts[table_name] = count;
+    }
+}
+
 Value VpaxBuilder::BuildVpax() {
     try {
-        // Build all sections
-        auto tables = BuildTables();
-        auto columns = BuildColumns();
+        // Pre-fetch all data once
+        PreFetchedData prefetched;
+        PreFetchData(prefetched);
+        
+        // Build all sections using pre-fetched data
+        auto tables = BuildTables(prefetched);
+        auto columns = BuildColumns(prefetched);
         auto measures = BuildMeasures();
         auto relationships = BuildRelationships();
-        // auto segments = BuildColumnSegments();
         auto column_hierarchies = BuildColumnHierarchies();
-        auto user_hierarchies = BuildUserHierarchies();
+        auto user_hierarchies = BuildUserHierarchies(prefetched);
         auto partitions = BuildPartitions();
-        // auto table_permissions = BuildTablePermissions();
-        // auto calc_items = BuildCalculationItems();
         
         // Create the main VPAX structure
         child_list_t<Value> vpax_values;
         vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), vector<Value>(tables.begin(), tables.end()))));
         vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
         vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
-        // vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), vector<Value>(segments.begin(), segments.end()))));
+        vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
         vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
         vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
         vpax_values.push_back(make_pair("Partitions", Value::LIST(VpaxSchema::CreatePartitionType(), vector<Value>(partitions.begin(), partitions.end()))));
-        // vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, vector<Value>(table_permissions.begin(), table_permissions.end()))));
-        // vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, vector<Value>(calc_items.begin(), calc_items.end()))));
-        vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
         vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         
         return Value::STRUCT(vpax_values);
         
    } catch (const std::exception &e) {
-        // This ensures we always return the expected VPAX type
-        
-        std::cout << "Error in BuildVpax: " << e.what() << std::endl;
-        
         // Create empty VPAX structure with correct type
         child_list_t<Value> empty_vpax_values;
         empty_vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), std::vector<Value>())));
@@ -75,7 +235,7 @@ Value VpaxBuilder::BuildVpax() {
     }
 }
 
-std::vector<Value> VpaxBuilder::BuildTables() {
+std::vector<Value> VpaxBuilder::BuildTables(const PreFetchedData &prefetched) {
     std::vector<Value> tables;
     
     std::string sql = R"(
@@ -106,12 +266,14 @@ std::vector<Value> VpaxBuilder::BuildTables() {
         int64_t ri_violation_count = stmt.GetValue<int64_t>(6);
         int table_id = stmt.GetValue<int>(7);
         
-        // Calculate actual sizes
-        int64_t columns_size = CalculateTableColumnsSize(table_id);
-        int64_t hierarchies_size = CalculateTableHierarchiesSize(table_id);
+        // Calculate sizes using pre-fetched data
+        int64_t columns_size = CalculateTableColumnsSize(table_id, prefetched);
+        int64_t hierarchies_size = CalculateTableHierarchiesSize(table_id, prefetched);
         int64_t table_size = columns_size + hierarchies_size;
-        int64_t rel_size = CalculateRelationshipSize(table_name, "");
-        bool is_referenced = VpaxUtils::CheckIfTableIsReferenced(db_, table_name);
+        int64_t rel_size = 0; // Will be calculated from relationships if needed
+        
+        // Check if referenced using pre-fetched data
+        bool is_referenced = prefetched.relationship_counts.count(table_name) > 0;
         
         tables.push_back(VpaxValueFactory::CreateTableValue(
             table_name, row_count, is_hidden, is_private, columns_size,
@@ -122,172 +284,73 @@ std::vector<Value> VpaxBuilder::BuildTables() {
     return tables;
 }
 
-int64_t VpaxBuilder::CalculateTableColumnsSize(int table_id) {
-    std::string sql = R"(
-        WITH TableFiles AS (
-        /*    SELECT sf.id AS FolderID
-            FROM [Table] t
-            INNER JOIN TableStorage ts ON t.ID = ts.TableID
-            INNER JOIN StorageFolder sf ON sf.id = ts.StorageFolderID
-            WHERE t.id = ?
-            
-            UNION
-            
-        */  SELECT ps.StorageFolderID AS FolderID
-            FROM [Table] t
-            INNER JOIN [Partition] p ON p.tableid = t.id
-            INNER JOIN PartitionStorage ps ON ps.partitionid = p.ID
-            WHERE t.id = ?
-            
-            UNION
-            
-            SELECT sf.ID
-            FROM COLUMN c
-            INNER JOIN [Table] t ON c.TableId = t.ID
-            INNER JOIN AttributeHierarchy ah ON ah.ColumnID = c.ID
-            INNER JOIN AttributeHierarchyStorage ahs ON ah.AttributeHierarchyStorageID = ahs.ID
-            INNER JOIN [Table] st ON st.id = ahs.SystemTableID
-            INNER JOIN [Partition] p ON p.tableid = st.id
-            INNER JOIN PartitionStorage ps ON ps.partitionid = p.id
-            INNER JOIN StorageFolder sf ON sf.ID = ps.StorageFolderID
-            WHERE t.ID = ?
-        )
-        SELECT DISTINCT
-            sff.FileName
-        FROM TableFiles tf
-        INNER JOIN StorageFile sff ON sff.StorageFolderID = tf.FolderID
-        CROSS JOIN [Table] t
-        WHERE t.id = ?;
-    )";
-    
-    SQLiteStatement stmt = db_.Prepare(sql);
-    stmt.Bind(0, table_id);
-    stmt.Bind(1, table_id);
-    stmt.Bind(2, table_id);
-    // stmt.Bind(3, table_id);
-    
+int64_t VpaxBuilder::CalculateTableColumnsSize(int table_id, const PreFetchedData &prefetched) {
     int64_t total = 0;
-    while (stmt.Step()) {
-        std::string data_filename = stmt.GetValue<std::string>(0);
-        total += GetFileSizeByName(data_filename);
-    }
-
-    SQLiteStatement stmt2 = db_.Prepare(R"(
-        select sum(ds.size) 
-        from column c 
-        join ColumnStorage cs on c.id = cs.ColumnID
-        JOIN DictionaryStorage ds on ds.ColumnStorageID = cs.ID
-        where c.TableID = ?;
-    )");
-
-    stmt2.Bind(0, table_id);
-    while (stmt2.Step()) {
-        int64_t dict_size = stmt2.GetValue<int64_t>(0);
-        total += dict_size;
-    }
-
-    return total;
-}
-
-int64_t VpaxBuilder::CalculateTableHierarchiesSize(int table_id) {
-    std::string sql = R"(
-        SELECT DISTINCT sff.FileName
-        FROM Hierarchy h
-        INNER JOIN [Table] t 
-            ON h.TableID = t.ID
-        INNER JOIN HierarchyStorage hs 
-            ON hs.HierarchyID = h.id
-        INNER JOIN [Table] st 
-            ON st.id = hs.SystemTableID
-        INNER JOIN [Partition] p 
-            ON p.tableid = st.id
-        INNER JOIN PartitionStorage ps 
-            ON ps.partitionid = p.id
-        INNER JOIN StorageFolder sf 
-            ON sf.ID = ps.StorageFolderID
-        INNER JOIN StorageFile sff 
-            ON sf.id = sff.StorageFolderID
-        WHERE t.ID = ?;
-    )";
     
+    // Get files from pre-fetched data
+    auto it = prefetched.table_files.find(table_id);
+    if (it != prefetched.table_files.end()) {
+        for (const auto &filename : it->second) {
+            total += GetFileSizeByName(filename);
+        }
+    }
+    
+    // Add dictionary sizes for all columns in this table
+    std::string sql = "SELECT ID FROM column WHERE TableID = ? AND Type = 1";
     SQLiteStatement stmt = db_.Prepare(sql);
     stmt.Bind(0, table_id);
     
-    int64_t total = 0;
     while (stmt.Step()) {
-        std::string hidx_filename = stmt.GetValue<std::string>(0);
-        total += GetFileSizeByName(hidx_filename);
+        int column_id = stmt.GetValue<int>(0);
+        auto dict_it = prefetched.dictionary_sizes.find(column_id);
+        if (dict_it != prefetched.dictionary_sizes.end()) {
+            total += dict_it->second;
+        }
     }
+    
     return total;
 }
 
-int64_t VpaxBuilder::CalculateColumnHierarchySize(int table_id, int column_id) {
-    std::string sql = R"(
-        SELECT DISTINCT sff.FileName
-        FROM COLUMN c
-        INNER JOIN [Table] t 
-            ON c.TableId = t.ID
-        INNER JOIN AttributeHierarchy ah 
-            ON ah.ColumnID = c.ID
-        INNER JOIN AttributeHierarchyStorage ahs 
-            ON ah.AttributeHierarchyStorageID = ahs.ID
-        INNER JOIN [Table] st 
-            ON st.id = ahs.SystemTableID
-        INNER JOIN [Partition] p 
-            ON p.tableid = st.id
-        INNER JOIN PartitionStorage ps 
-            ON ps.partitionid = p.id
-        INNER JOIN StorageFolder sf 
-            ON sf.ID = ps.StorageFolderID
-        INNER JOIN StorageFile sff 
-            ON sf.id = sff.StorageFolderID
-        WHERE t.ID = ? and c.ID = ?;
-    )";
-    
-    SQLiteStatement stmt = db_.Prepare(sql);
-    stmt.Bind(0, table_id);
-    stmt.Bind(1, column_id);
-    
+int64_t VpaxBuilder::CalculateTableHierarchiesSize(int table_id, const PreFetchedData &prefetched) {
     int64_t total = 0;
-    while (stmt.Step()) {
-        std::string hidx_filename = stmt.GetValue<std::string>(0);
-        total += GetFileSizeByName(hidx_filename);
+    
+    auto it = prefetched.table_hierarchy_files.find(table_id);
+    if (it != prefetched.table_hierarchy_files.end()) {
+        for (const auto &filename : it->second) {
+            total += GetFileSizeByName(filename);
+        }
     }
+    
     return total;
 }
 
-
-int64_t VpaxBuilder::CalculateUserHierarchySize(int hierarchy_id) {
-    std::string sql = R"(
-        SELECT DISTINCT sff.FileName
-        FROM Hierarchy h
-        INNER JOIN HierarchyStorage hs 
-            ON hs.HierarchyID = h.id
-        INNER JOIN [Table] st 
-            ON st.id = hs.SystemTableID
-        INNER JOIN [Partition] p 
-            ON p.tableid = st.id
-        INNER JOIN PartitionStorage ps 
-            ON ps.partitionid = p.id
-        INNER JOIN StorageFolder sf 
-            ON sf.ID = ps.StorageFolderID
-        INNER JOIN StorageFile sff 
-            ON sf.id = sff.StorageFolderID
-        WHERE h.ID=?;
-    )";
-    
-    SQLiteStatement stmt = db_.Prepare(sql);
-    stmt.Bind(0, hierarchy_id);
-    
+int64_t VpaxBuilder::CalculateColumnHierarchySize(int column_id, const PreFetchedData &prefetched) {
     int64_t total = 0;
-    while (stmt.Step()) {
-        std::string hierarchy_filename = stmt.GetValue<std::string>(0);
-        total += GetFileSizeByName(hierarchy_filename);
+    
+    auto it = prefetched.column_hierarchy_files.find(column_id);
+    if (it != prefetched.column_hierarchy_files.end()) {
+        for (const auto &filename : it->second) {
+            total += GetFileSizeByName(filename);
+        }
     }
+    
     return total;
 }
 
-std::vector<Value> VpaxBuilder::BuildColumns() {
+int64_t VpaxBuilder::CalculateUserHierarchySize(int hierarchy_id, const PreFetchedData &prefetched) {
+    int64_t total = 0;
+    
+    auto it = prefetched.user_hierarchy_files.find(hierarchy_id);
+    if (it != prefetched.user_hierarchy_files.end()) {
+        for (const auto &filename : it->second) {
+            total += GetFileSizeByName(filename);
+        }
+    }
+    
+    return total;
+}
+
+std::vector<Value> VpaxBuilder::BuildColumns(const PreFetchedData &prefetched) {
     std::vector<Value> columns;
     
     std::string sql = R"(
@@ -308,19 +371,13 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
             c.KeepUniqueRows,
             CAST(c.State as VARCHAR) as State,
             c.IsAvailableInMDX,
-            ds.Size as DictionarySize,
-            sfi.FileName AS IDFFileName,
             case WHEN ds.StorageFileID=0 THEN 'VALUE' ELSE 'HASH' END AS Encoding,
             c.ID,
             t.ID as TableID
         FROM COLUMN c
         JOIN [Table] t ON c.TableId = t.ID
         JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
-        -- Dictionary
         LEFT JOIN DictionaryStorage ds ON cs.DictionaryStorageID = ds.ID
-        -- IDF (Index/Data File)
-        LEFT JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
-        LEFT JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
         WHERE t.systemflags = 0
     )";
     
@@ -342,21 +399,29 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
         bool keep_unique_rows = stmt.GetValue<int>(13) != 0;
         std::string state = stmt.GetValue<std::string>(14);
         bool is_available_in_mdx = stmt.GetValue<int>(15) != 0;
-        int64_t dictionary_size = stmt.GetValue<int64_t>(16);
-        std::string idf_filename = stmt.GetValue<std::string>(17);
-        std::string encoding = stmt.GetValue<std::string>(18);
-        int column_id = stmt.GetValue<int>(19);
-        int table_id = stmt.GetValue<int>(20);
+        std::string encoding = stmt.GetValue<std::string>(16);
+        int column_id = stmt.GetValue<int>(17);
+        int table_id = stmt.GetValue<int>(18);
 
         std::string data_type = VpaxUtils::DataTypeIdToString(data_type_id);
         
-        // Calculate actual sizes from file log
-        int64_t data_size = GetFileSizeByName(idf_filename);
-        int64_t total_size = dictionary_size + data_size;
-        int64_t hierarchies_size = CalculateColumnHierarchySize(table_id, column_id);
-        total_size += hierarchies_size;
+        // Get sizes from pre-fetched data
+        int64_t dictionary_size = 0;
+        auto dict_it = prefetched.dictionary_sizes.find(column_id);
+        if (dict_it != prefetched.dictionary_sizes.end()) {
+            dictionary_size = dict_it->second;
+        }
         
-        double selectivity = CalculateSelectivity(table_name, column_name);
+        int64_t data_size = 0;
+        auto file_it = prefetched.column_files.find(column_id);
+        if (file_it != prefetched.column_files.end()) {
+            data_size = GetFileSizeByName(file_it->second);
+        }
+        
+        int64_t hierarchies_size = CalculateColumnHierarchySize(column_id, prefetched);
+        int64_t total_size = dictionary_size + data_size + hierarchies_size;
+        
+        double selectivity = 0.0; // TODO: Calculate if needed
         
         columns.push_back(VpaxValueFactory::CreateColumnValue(
             column_name, table_name, data_type, is_hidden, cardinality,
@@ -367,6 +432,41 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
     }
     
     return columns;
+}
+
+std::vector<Value> VpaxBuilder::BuildUserHierarchies(const PreFetchedData &prefetched) {
+    std::vector<Value> hierarchies;
+    
+    std::string sql = R"(
+        SELECT 
+            t.Name as TableName,
+            h.Name as HierarchyName,
+            h.isHidden,
+            (SELECT GROUP_CONCAT(l.Name, '|')
+            FROM Level l 
+            WHERE l.HierarchyID = h.id
+            ORDER BY l.Ordinal) as Levels,
+            h.id
+        FROM Hierarchy h
+        JOIN [Table] t ON h.TableID = t.ID
+    )";
+    
+    SQLiteStatement stmt = db_.Prepare(sql);
+    while (stmt.Step()) {
+        std::string table_name = stmt.GetValue<std::string>(0);
+        std::string hierarchy_name = stmt.GetValue<std::string>(1);
+        bool is_hidden = stmt.GetValue<int>(2) != 0;
+        std::string levels = stmt.GetValue<std::string>(3);
+        int hierarchy_id = stmt.GetValue<int>(4);
+        
+        int64_t hierarchy_size = CalculateUserHierarchySize(hierarchy_id, prefetched);
+
+        hierarchies.push_back(VpaxValueFactory::CreateUserHierarchyValue(
+            table_name, hierarchy_name, is_hidden, hierarchy_size, levels
+        ));
+    }
+    
+    return hierarchies;
 }
 
 std::vector<Value> VpaxBuilder::BuildMeasures() {
@@ -483,25 +583,21 @@ std::vector<Value> VpaxBuilder::BuildRelationships() {
         int64_t from_cardinality = stmt.GetValue<int64_t>(14);
         int64_t to_cardinality = stmt.GetValue<int64_t>(15);
         
-        // Convert join on date behavior
         std::string join_behavior = "DateAndTime";
         if (join_on_date_behavior == 1) {
             join_behavior = "DatePartOnly";
         }
         
-        // Convert relationship type
         std::string rel_type = "Regular";
         if (relationship_type == 1) {
             rel_type = "Limited";
         }
         
-        // Convert security filtering behavior
         std::string security_behavior = "OneDirection";
         if (security_filtering_behavior == 2) {
             security_behavior = "BothDirections";
         }
         
-        // Map CrossFilteringBehavior to match expected values
         if (cross_filtering == "Single") {
             cross_filtering = "OneDirection";
         } else if (cross_filtering == "Both") {
@@ -517,42 +613,6 @@ std::vector<Value> VpaxBuilder::BuildRelationships() {
     }
     
     return relationships;
-}
-
-std::vector<Value> VpaxBuilder::BuildColumnSegments() {
-    std::vector<Value> segments;
-    
-    // This is a simplified implementation
-    // In a real scenario, you'd query partition and segment metadata
-    std::string sql = R"(
-        SELECT 
-            c.ExplicitName as ColumnName,
-            t.Name as TableName,
-            COALESCE(p.Name, 'Partition') as PartitionName,
-            COALESCE(cs.SegmentNumber, 0) as SegmentNumber,
-            666 as UsedSize
-        FROM COLUMN c
-        JOIN [Table] t ON c.TableId = t.ID
-        LEFT JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
-        LEFT JOIN Partition p ON p.TableID = t.ID
-        WHERE c.Type = 1
-    )";
-    
-    SQLiteStatement stmt = db_.Prepare(sql);
-    while (stmt.Step()) {
-        std::string column_name = stmt.GetValue<std::string>(0);
-        std::string table_name = stmt.GetValue<std::string>(1);
-        std::string partition_name = stmt.GetValue<std::string>(2);
-        int segment_number = stmt.GetValue<int>(3);
-        int64_t used_size = stmt.GetValue<int64_t>(4);
-        
-        segments.push_back(VpaxValueFactory::CreateColumnSegmentValue(
-            column_name, table_name, partition_name, segment_number,
-            0, 0, used_size, "Hash", 0, 0, "Ready"
-        ));
-    }
-    
-    return segments;
 }
 
 std::vector<Value> VpaxBuilder::BuildColumnHierarchies() {
@@ -593,40 +653,6 @@ std::vector<Value> VpaxBuilder::BuildColumnHierarchies() {
     return hierarchies;
 }
 
-std::vector<Value> VpaxBuilder::BuildUserHierarchies() {
-    std::vector<Value> hierarchies;
-    
-    std::string sql = R"(
-        SELECT 
-            t.Name as TableName,
-            h.Name as HierarchyName,
-            h.isHidden,
-            (SELECT GROUP_CONCAT(l.Name, '|')
-            FROM Level l 
-            WHERE l.HierarchyID = h.id
-            ORDER BY l.Ordinal) as Levels,
-            h.id
-        FROM Hierarchy h
-        JOIN [Table] t ON h.TableID = t.ID;
-    )";
-    
-    SQLiteStatement stmt = db_.Prepare(sql);
-    while (stmt.Step()) {
-        std::string table_name = stmt.GetValue<std::string>(0);
-        std::string hierarchy_name = stmt.GetValue<std::string>(1);
-        bool is_hidden = stmt.GetValue<int>(2) != 0;
-        std::string levels = stmt.GetValue<std::string>(3);
-        int64_t hierarchy_id = stmt.GetValue<int64_t>(4);
-        int64_t hierarchy_size = CalculateUserHierarchySize(hierarchy_id);
-
-        hierarchies.push_back(VpaxValueFactory::CreateUserHierarchyValue(
-            table_name, hierarchy_name, is_hidden, hierarchy_size, levels
-        ));
-    }
-    
-    return hierarchies;
-}
-
 std::vector<Value> VpaxBuilder::BuildPartitions() {
     std::vector<Value> partitions;
     
@@ -658,7 +684,6 @@ std::vector<Value> VpaxBuilder::BuildPartitions() {
         int64_t refreshed_time_ticks = stmt.GetValue<int64_t>(6);
         std::string refresh_bookmark = stmt.GetValue<std::string>(7);
         
-        // Convert Windows file time to ISO 8601 string
         std::string refreshed_time = VpaxUtils::WindowsFileTimeToISO8601(refreshed_time_ticks);
         
         partitions.push_back(VpaxValueFactory::CreatePartitionValue(
@@ -676,24 +701,24 @@ std::vector<Value> VpaxBuilder::BuildPartitions() {
     return partitions;
 }
 
+std::vector<Value> VpaxBuilder::BuildColumnSegments() {
+    return std::vector<Value>(); // Empty for now
+}
+
 std::vector<Value> VpaxBuilder::BuildTablePermissions() {
-    // Empty for now - would require security metadata
-    return std::vector<Value>();
+    return std::vector<Value>(); // Empty for now
 }
 
 std::vector<Value> VpaxBuilder::BuildCalculationItems() {
-    // Empty for now - would require calculation group metadata  
-    return std::vector<Value>();
+    return std::vector<Value>(); // Empty for now
 }
 
 int64_t VpaxBuilder::CalculateRelationshipSize(const std::string &from_table, const std::string &to_table) {
-    // Implementation would depend on relationship storage metadata
-    return 0;
+    return 0; // Implementation depends on relationship storage metadata
 }
 
 double VpaxBuilder::CalculateSelectivity(const std::string &table_name, const std::string &column_name) {
-    // Implementation would calculate cardinality / row_count
-    return 0.0;
+    return 0.0; // Implementation would calculate cardinality / row_count
 }
 
 Value VpaxBuilder::CreateErrorResult(const std::exception &e) {
