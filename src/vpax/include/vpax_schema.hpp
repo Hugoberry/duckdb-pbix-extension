@@ -51,6 +51,7 @@ public:
         int64_t total_size = 0,
         int64_t dictionary_size = 0,
         int64_t data_size = 0,
+        int64_t hier_size = 0,
         bool is_key = false,
         bool is_nullable = true,
         bool is_unique = false,

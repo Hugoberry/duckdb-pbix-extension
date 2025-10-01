@@ -84,7 +84,8 @@ std::vector<Value> VpaxBuilder::BuildTables() {
             t.IsPrivate,
             t.DataCategory,
             t.Description,
-            ts.RIViolationCount
+            ts.RIViolationCount,
+            t.ID
         FROM [table] t
         LEFT JOIN [Column] c on t.ID = C.TableID
         LEFT JOIN [ColumnStorage] cs on c.ID = cs.ColumnID
@@ -101,10 +102,11 @@ std::vector<Value> VpaxBuilder::BuildTables() {
         std::string data_category = stmt.GetValue<std::string>(4);
         std::string description = stmt.GetValue<std::string>(5);
         int64_t ri_violation_count = stmt.GetValue<int64_t>(6);
+        int table_id = stmt.GetValue<int>(7);
         
         // Calculate actual sizes
-        int64_t columns_size = CalculateTableColumnsSize(table_name);
-        int64_t hierarchies_size = CalculateTableHierarchiesSize(table_name);
+        int64_t columns_size = CalculateTableColumnsSize(table_id);
+        int64_t hierarchies_size = CalculateTableHierarchiesSize(table_id);
         int64_t table_size = columns_size + hierarchies_size;
         int64_t rel_size = CalculateRelationshipSize(table_name, "");
         bool is_referenced = VpaxUtils::CheckIfTableIsReferenced(db_, table_name);
@@ -118,7 +120,7 @@ std::vector<Value> VpaxBuilder::BuildTables() {
     return tables;
 }
 
-int64_t VpaxBuilder::CalculateTableColumnsSize(const std::string &table_name) {
+int64_t VpaxBuilder::CalculateTableColumnsSize(int table_id) {
     std::string sql = R"(
         SELECT 
             sfd.FileName AS DictionaryFileName,
@@ -130,11 +132,11 @@ int64_t VpaxBuilder::CalculateTableColumnsSize(const std::string &table_name) {
         LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
         LEFT JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
         LEFT JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
-        WHERE t.Name = ? AND c.Type IN (1,2)
+        WHERE t.ID = ? AND c.Type IN (1,2)
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
-    stmt.BindText(0, string_t(table_name));
+    stmt.Bind(0, table_id);
     
     int64_t total = 0;
     while (stmt.Step()) {
@@ -146,19 +148,64 @@ int64_t VpaxBuilder::CalculateTableColumnsSize(const std::string &table_name) {
     return total;
 }
 
-int64_t VpaxBuilder::CalculateTableHierarchiesSize(const std::string &table_name) {
+int64_t VpaxBuilder::CalculateTableHierarchiesSize(int table_id) {
     std::string sql = R"(
-        SELECT sfh.FileName AS HIDXFileName
-        FROM COLUMN c
-        JOIN [Table] t ON c.TableId = t.ID
-        LEFT JOIN AttributeHierarchy ah ON ah.ColumnID = c.ID
-        LEFT JOIN AttributeHierarchyStorage ahs ON ah.AttributeHierarchyStorageID = ahs.ID
-        LEFT JOIN StorageFile sfh ON sfh.ID = ahs.StorageFileID
-        WHERE t.Name = ? AND c.Type IN (1,2)
+        SELECT DISTINCT sff.FileName
+        FROM Hierarchy h
+        INNER JOIN [Table] t 
+            ON h.TableID = t.ID
+        INNER JOIN HierarchyStorage hs 
+            ON hs.HierarchyID = h.id
+        INNER JOIN [Table] st 
+            ON st.id = hs.SystemTableID
+        INNER JOIN [Partition] p 
+            ON p.tableid = st.id
+        INNER JOIN PartitionStorage ps 
+            ON ps.partitionid = p.id
+        INNER JOIN StorageFolder sf 
+            ON sf.ID = ps.StorageFolderID
+        INNER JOIN StorageFile sff 
+            ON sf.id = sff.StorageFolderID
+        WHERE t.ID = ?;
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
-    stmt.BindText(0, string_t(table_name));
+    stmt.Bind(0, table_id);
+    
+    int64_t total = 0;
+    while (stmt.Step()) {
+        std::string hidx_filename = stmt.GetValue<std::string>(0);
+        total += GetFileSizeByName(hidx_filename);
+    }
+    return total;
+}
+
+int64_t VpaxBuilder::CalculateColumnHierarchySize(int table_id, int column_id) {
+    std::string sql = R"(
+        SELECT DISTINCT sff.FileName
+        FROM COLUMN c
+        INNER JOIN [Table] t 
+            ON c.TableId = t.ID
+        INNER JOIN AttributeHierarchy ah 
+            ON ah.ColumnID = c.ID
+        INNER JOIN AttributeHierarchyStorage ahs 
+            ON ah.AttributeHierarchyStorageID = ahs.ID
+        INNER JOIN [Table] st 
+            ON st.id = ahs.SystemTableID
+        INNER JOIN [Partition] p 
+            ON p.tableid = st.id
+        INNER JOIN PartitionStorage ps 
+            ON ps.partitionid = p.id
+        INNER JOIN StorageFolder sf 
+            ON sf.ID = ps.StorageFolderID
+        INNER JOIN StorageFile sff 
+            ON sf.id = sff.StorageFolderID
+        WHERE t.ID = ? and c.ID = ?;
+    )";
+    
+    SQLiteStatement stmt = db_.Prepare(sql);
+    stmt.Bind(0, table_id);
+    stmt.Bind(1, column_id);
     
     int64_t total = 0;
     while (stmt.Step()) {
@@ -191,7 +238,9 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
             c.IsAvailableInMDX,
             ds.Size as DictionarySize,
             sfi.FileName AS IDFFileName,
-            case WHEN ds.StorageFileID=0 THEN 'VALUE' ELSE 'HASH' END AS Encoding
+            case WHEN ds.StorageFileID=0 THEN 'VALUE' ELSE 'HASH' END AS Encoding,
+            c.ID,
+            t.ID as TableID
         FROM COLUMN c
         JOIN [Table] t ON c.TableId = t.ID
         JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
@@ -224,19 +273,22 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
         int64_t dictionary_size = stmt.GetValue<int64_t>(16);
         std::string idf_filename = stmt.GetValue<std::string>(17);
         std::string encoding = stmt.GetValue<std::string>(18);
+        int column_id = stmt.GetValue<int>(19);
+        int table_id = stmt.GetValue<int>(20);
 
         std::string data_type = VpaxUtils::DataTypeIdToString(data_type_id);
         
         // Calculate actual sizes from file log
         int64_t data_size = GetFileSizeByName(idf_filename);
         int64_t total_size = dictionary_size + data_size;
-        int64_t hierarchies_size = 0; // Not implemented yet
+        int64_t hierarchies_size = CalculateColumnHierarchySize(table_id, column_id);
+        total_size += hierarchies_size;
         
         double selectivity = CalculateSelectivity(table_name, column_name);
         
         columns.push_back(VpaxValueFactory::CreateColumnValue(
             column_name, table_name, data_type, is_hidden, cardinality,
-            total_size, dictionary_size, data_size, is_key, is_nullable,
+            total_size, dictionary_size, data_size, hierarchies_size, is_key, is_nullable,
             is_unique, keep_unique_rows, is_available_in_mdx, display_folder, encoding, description,
             expression, format_string, encoding_hint, state, selectivity
         ));

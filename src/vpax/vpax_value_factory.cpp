@@ -44,6 +44,7 @@ Value VpaxValueFactory::CreateColumnValue(
     int64_t total_size,
     int64_t dictionary_size,
     int64_t data_size,
+    int64_t hier_size,
     bool is_key,
     bool is_nullable,
     bool is_unique,
@@ -83,7 +84,7 @@ Value VpaxValueFactory::CreateColumnValue(
     column_values.push_back(make_pair("IsReferenced", Value::BOOLEAN(false))); // TODO: Implement
     column_values.push_back(make_pair("DictionarySize", Value::BIGINT(dictionary_size)));
     column_values.push_back(make_pair("DataSize", Value::BIGINT(data_size)));
-    column_values.push_back(make_pair("HierarchiesSize", Value::BIGINT(0))); // TODO: Calculate
+    column_values.push_back(make_pair("HierarchiesSize", Value::BIGINT(hier_size)));
     column_values.push_back(make_pair("TotalSize", Value::BIGINT(total_size)));
     column_values.push_back(make_pair("Selectivity", Value::DOUBLE(selectivity)));
     
