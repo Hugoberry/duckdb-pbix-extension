@@ -189,24 +189,18 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
             c.KeepUniqueRows,
             CAST(c.State as VARCHAR) as State,
             c.IsAvailableInMDX,
-            sfd.FileName AS DictionaryFileName,
-            sfh.FileName AS HIDXFileName,
-            sfi.FileName AS IDFFileName
+            ds.Size as DictionarySize,
+            sfi.FileName AS IDFFileName,
+            case WHEN ds.StorageFileID=0 THEN 'VALUE' ELSE 'HASH' END AS Encoding
         FROM COLUMN c
         JOIN [Table] t ON c.TableId = t.ID
         JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
-        -- HIDX (Hash Index)
-        LEFT JOIN AttributeHierarchy ah ON ah.ColumnID = c.ID
-        LEFT JOIN AttributeHierarchyStorage ahs ON ah.AttributeHierarchyStorageID = ahs.ID
-        LEFT JOIN StorageFile sfh ON sfh.ID = ahs.StorageFileID
         -- Dictionary
         LEFT JOIN DictionaryStorage ds ON cs.DictionaryStorageID = ds.ID
-        LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
         -- IDF (Index/Data File)
         LEFT JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
         LEFT JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
-        WHERE c.Type IN (1,2) and t.systemflags = 0
-        ORDER BY t.Name, cs.StoragePosition
+        WHERE t.systemflags = 0
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
@@ -227,25 +221,23 @@ std::vector<Value> VpaxBuilder::BuildColumns() {
         bool keep_unique_rows = stmt.GetValue<int>(13) != 0;
         std::string state = stmt.GetValue<std::string>(14);
         bool is_available_in_mdx = stmt.GetValue<int>(15) != 0;
-        std::string dict_filename = stmt.GetValue<std::string>(16);
-        std::string hidx_filename = stmt.GetValue<std::string>(17);
-        std::string idf_filename = stmt.GetValue<std::string>(18);
+        int64_t dictionary_size = stmt.GetValue<int64_t>(16);
+        std::string idf_filename = stmt.GetValue<std::string>(17);
+        std::string encoding = stmt.GetValue<std::string>(18);
 
         std::string data_type = VpaxUtils::DataTypeIdToString(data_type_id);
         
         // Calculate actual sizes from file log
-        int64_t dictionary_size = GetFileSizeByName(dict_filename);
-        int64_t hidx_size = GetFileSizeByName(hidx_filename);
         int64_t data_size = GetFileSizeByName(idf_filename);
         int64_t total_size = dictionary_size + data_size;
-        int64_t hierarchies_size = hidx_size;
+        int64_t hierarchies_size = 0; // Not implemented yet
         
         double selectivity = CalculateSelectivity(table_name, column_name);
         
         columns.push_back(VpaxValueFactory::CreateColumnValue(
             column_name, table_name, data_type, is_hidden, cardinality,
             total_size, dictionary_size, data_size, is_key, is_nullable,
-            is_unique, keep_unique_rows, is_available_in_mdx, display_folder, "Hash", description,
+            is_unique, keep_unique_rows, is_available_in_mdx, display_folder, encoding, description,
             expression, format_string, encoding_hint, state, selectivity
         ));
     }
