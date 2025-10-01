@@ -122,29 +122,68 @@ std::vector<Value> VpaxBuilder::BuildTables() {
 
 int64_t VpaxBuilder::CalculateTableColumnsSize(int table_id) {
     std::string sql = R"(
-        SELECT 
-            sfd.FileName AS DictionaryFileName,
-            sfi.FileName AS IDFFileName
-        FROM COLUMN c
-        JOIN [Table] t ON c.TableId = t.ID
-        JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
-        LEFT JOIN DictionaryStorage ds ON cs.DictionaryStorageID = ds.ID
-        LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
-        LEFT JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
-        LEFT JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
-        WHERE t.ID = ? AND c.Type IN (1,2)
+        WITH TableFiles AS (
+        /*    SELECT sf.id AS FolderID
+            FROM [Table] t
+            INNER JOIN TableStorage ts ON t.ID = ts.TableID
+            INNER JOIN StorageFolder sf ON sf.id = ts.StorageFolderID
+            WHERE t.id = ?
+            
+            UNION
+            
+        */  SELECT ps.StorageFolderID AS FolderID
+            FROM [Table] t
+            INNER JOIN [Partition] p ON p.tableid = t.id
+            INNER JOIN PartitionStorage ps ON ps.partitionid = p.ID
+            WHERE t.id = ?
+            
+            UNION
+            
+            SELECT sf.ID
+            FROM COLUMN c
+            INNER JOIN [Table] t ON c.TableId = t.ID
+            INNER JOIN AttributeHierarchy ah ON ah.ColumnID = c.ID
+            INNER JOIN AttributeHierarchyStorage ahs ON ah.AttributeHierarchyStorageID = ahs.ID
+            INNER JOIN [Table] st ON st.id = ahs.SystemTableID
+            INNER JOIN [Partition] p ON p.tableid = st.id
+            INNER JOIN PartitionStorage ps ON ps.partitionid = p.id
+            INNER JOIN StorageFolder sf ON sf.ID = ps.StorageFolderID
+            WHERE t.ID = ?
+        )
+        SELECT DISTINCT
+            sff.FileName
+        FROM TableFiles tf
+        INNER JOIN StorageFile sff ON sff.StorageFolderID = tf.FolderID
+        CROSS JOIN [Table] t
+        WHERE t.id = ?;
     )";
     
     SQLiteStatement stmt = db_.Prepare(sql);
     stmt.Bind(0, table_id);
+    stmt.Bind(1, table_id);
+    stmt.Bind(2, table_id);
+    // stmt.Bind(3, table_id);
     
     int64_t total = 0;
     while (stmt.Step()) {
-        std::string dict_filename = stmt.GetValue<std::string>(0);
-        std::string idf_filename = stmt.GetValue<std::string>(1);
-        total += GetFileSizeByName(dict_filename);
-        total += GetFileSizeByName(idf_filename);
+        std::string data_filename = stmt.GetValue<std::string>(0);
+        total += GetFileSizeByName(data_filename);
     }
+
+    SQLiteStatement stmt2 = db_.Prepare(R"(
+        select sum(ds.size) 
+        from column c 
+        join ColumnStorage cs on c.id = cs.ColumnID
+        JOIN DictionaryStorage ds on ds.ColumnStorageID = cs.ID
+        where c.TableID = ?;
+    )");
+
+    stmt2.Bind(0, table_id);
+    while (stmt2.Step()) {
+        int64_t dict_size = stmt2.GetValue<int64_t>(0);
+        total += dict_size;
+    }
+
     return total;
 }
 
