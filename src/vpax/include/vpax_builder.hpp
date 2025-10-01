@@ -44,6 +44,7 @@ private:
     int64_t CalculateTableColumnsSize(int table_id);
     int64_t CalculateTableHierarchiesSize(int table_id);
     int64_t CalculateColumnHierarchySize(int table_id, int column_id);
+    int64_t CalculateUserHierarchySize(int hierarchy_id);
     int64_t CalculateRelationshipSize(const std::string &from_table, const std::string &to_table);
     double CalculateSelectivity(const std::string &table_name, const std::string &column_name);
     

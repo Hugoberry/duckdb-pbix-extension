@@ -254,6 +254,37 @@ int64_t VpaxBuilder::CalculateColumnHierarchySize(int table_id, int column_id) {
     return total;
 }
 
+
+int64_t VpaxBuilder::CalculateUserHierarchySize(int hierarchy_id) {
+    std::string sql = R"(
+        SELECT DISTINCT sff.FileName
+        FROM Hierarchy h
+        INNER JOIN HierarchyStorage hs 
+            ON hs.HierarchyID = h.id
+        INNER JOIN [Table] st 
+            ON st.id = hs.SystemTableID
+        INNER JOIN [Partition] p 
+            ON p.tableid = st.id
+        INNER JOIN PartitionStorage ps 
+            ON ps.partitionid = p.id
+        INNER JOIN StorageFolder sf 
+            ON sf.ID = ps.StorageFolderID
+        INNER JOIN StorageFile sff 
+            ON sf.id = sff.StorageFolderID
+        WHERE h.ID=?;
+    )";
+    
+    SQLiteStatement stmt = db_.Prepare(sql);
+    stmt.Bind(0, hierarchy_id);
+    
+    int64_t total = 0;
+    while (stmt.Step()) {
+        std::string hierarchy_filename = stmt.GetValue<std::string>(0);
+        total += GetFileSizeByName(hierarchy_filename);
+    }
+    return total;
+}
+
 std::vector<Value> VpaxBuilder::BuildColumns() {
     std::vector<Value> columns;
     
@@ -535,11 +566,11 @@ std::vector<Value> VpaxBuilder::BuildUserHierarchies() {
             t.Name as TableName,
             h.Name as HierarchyName,
             h.isHidden,
-            666 as UsedSize,
             (SELECT GROUP_CONCAT(l.Name, '|')
             FROM Level l 
             WHERE l.HierarchyID = h.id
-            ORDER BY l.Ordinal) as Levels
+            ORDER BY l.Ordinal) as Levels,
+            h.id
         FROM Hierarchy h
         JOIN [Table] t ON h.TableID = t.ID;
     )";
@@ -549,11 +580,12 @@ std::vector<Value> VpaxBuilder::BuildUserHierarchies() {
         std::string table_name = stmt.GetValue<std::string>(0);
         std::string hierarchy_name = stmt.GetValue<std::string>(1);
         bool is_hidden = stmt.GetValue<int>(2) != 0;
-        int64_t used_size = stmt.GetValue<int64_t>(3);
-        std::string levels = stmt.GetValue<std::string>(4);
+        std::string levels = stmt.GetValue<std::string>(3);
+        int64_t hierarchy_id = stmt.GetValue<int64_t>(4);
+        int64_t hierarchy_size = CalculateUserHierarchySize(hierarchy_id);
 
         hierarchies.push_back(VpaxValueFactory::CreateUserHierarchyValue(
-            table_name, hierarchy_name, is_hidden, used_size, levels
+            table_name, hierarchy_name, is_hidden, hierarchy_size, levels
         ));
     }
     
