@@ -31,6 +31,7 @@ Value VpaxBuilder::BuildVpax() {
         // auto segments = BuildColumnSegments();
         auto column_hierarchies = BuildColumnHierarchies();
         auto user_hierarchies = BuildUserHierarchies();
+        auto partitions = BuildPartitions();
         // auto table_permissions = BuildTablePermissions();
         // auto calc_items = BuildCalculationItems();
         
@@ -43,6 +44,7 @@ Value VpaxBuilder::BuildVpax() {
         vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
         vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
         vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
+        vpax_values.push_back(make_pair("Partitions", Value::LIST(VpaxSchema::CreatePartitionType(), vector<Value>(partitions.begin(), partitions.end()))));
         // vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, vector<Value>(table_permissions.begin(), table_permissions.end()))));
         // vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, vector<Value>(calc_items.begin(), calc_items.end()))));
         vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
@@ -65,6 +67,7 @@ Value VpaxBuilder::BuildVpax() {
         empty_vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
         empty_vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), std::vector<Value>())));
         empty_vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), std::vector<Value>())));
+        empty_vpax_values.push_back(make_pair("Partitions", Value::LIST(VpaxSchema::CreatePartitionType(), std::vector<Value>())));
         empty_vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         empty_vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
         
@@ -622,6 +625,55 @@ std::vector<Value> VpaxBuilder::BuildUserHierarchies() {
     }
     
     return hierarchies;
+}
+
+std::vector<Value> VpaxBuilder::BuildPartitions() {
+    std::vector<Value> partitions;
+    
+    std::string sql = R"(
+        SELECT 
+            t.Name as TableName, 
+            p.Name as PartitionName, 
+            p.QueryDefinition,
+            sms.SegmentCount, 
+            sms.RecordCount, 
+            sms.RecordsPerSegment,
+            p.RefreshedTime, 
+            p.RefreshBookmark
+        FROM SegmentMapStorage sms
+        JOIN PartitionStorage ps ON ps.id = sms.PartitionStorageID
+        JOIN Partition p ON p.ID = ps.PartitionID
+        JOIN [Table] t ON t.ID = p.TableID
+        WHERE p.SystemFlags = 0
+    )";
+    
+    SQLiteStatement stmt = db_.Prepare(sql);
+    while (stmt.Step()) {
+        std::string table_name = stmt.GetValue<std::string>(0);
+        std::string partition_name = stmt.GetValue<std::string>(1);
+        std::string query_definition = stmt.GetValue<std::string>(2);
+        int64_t segment_count = stmt.GetValue<int64_t>(3);
+        int64_t record_count = stmt.GetValue<int64_t>(4);
+        int64_t records_per_segment = stmt.GetValue<int64_t>(5);
+        int64_t refreshed_time_ticks = stmt.GetValue<int64_t>(6);
+        std::string refresh_bookmark = stmt.GetValue<std::string>(7);
+        
+        // Convert Windows file time to ISO 8601 string
+        std::string refreshed_time = VpaxUtils::WindowsFileTimeToISO8601(refreshed_time_ticks);
+        
+        partitions.push_back(VpaxValueFactory::CreatePartitionValue(
+            table_name,
+            partition_name,
+            query_definition,
+            segment_count,
+            record_count,
+            records_per_segment,
+            refreshed_time,
+            refresh_bookmark
+        ));
+    }
+    
+    return partitions;
 }
 
 std::vector<Value> VpaxBuilder::BuildTablePermissions() {

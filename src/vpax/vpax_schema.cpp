@@ -154,6 +154,20 @@ LogicalType VpaxSchema::CreateColumnHierarchyType() {
     return LogicalType::STRUCT(hierarchy_children);
 }
 
+LogicalType VpaxSchema::CreatePartitionType() {
+    child_list_t<LogicalType> partition_children;
+    partition_children.push_back(make_pair("TableName", LogicalType::VARCHAR));
+    partition_children.push_back(make_pair("PartitionName", LogicalType::VARCHAR));
+    partition_children.push_back(make_pair("QueryDefinition", LogicalType::VARCHAR));
+    partition_children.push_back(make_pair("SegmentCount", LogicalType::BIGINT));
+    partition_children.push_back(make_pair("RecordCount", LogicalType::BIGINT));
+    partition_children.push_back(make_pair("RecordsPerSegment", LogicalType::BIGINT));
+    partition_children.push_back(make_pair("RefreshedTime", LogicalType::VARCHAR));
+    partition_children.push_back(make_pair("RefreshBookmark", LogicalType::VARCHAR));
+    
+    return LogicalType::STRUCT(partition_children);
+}
+
 LogicalType VpaxSchema::CreateErrorType() {
     child_list_t<LogicalType> error_children;
     error_children.push_back(make_pair("error", LogicalType::VARCHAR));
@@ -175,6 +189,7 @@ LogicalType VpaxSchema::CreateVpaxType() {
     vpax_children.push_back(make_pair("ColumnsHierarchies", LogicalType::LIST(CreateColumnHierarchyType())));
     vpax_children.push_back(make_pair("UserHierarchies", LogicalType::LIST(CreateUserHierarchyType())));
     vpax_children.push_back(make_pair("Relationships", LogicalType::LIST(CreateRelationshipType())));
+    vpax_children.push_back(make_pair("Partitions", LogicalType::LIST(CreatePartitionType())));
     vpax_children.push_back(make_pair("TablePermissions", LogicalType::LIST(LogicalType::VARCHAR))); // Empty arrays
     vpax_children.push_back(make_pair("CalculationItems", LogicalType::LIST(LogicalType::VARCHAR))); // Empty arrays
     

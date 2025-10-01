@@ -246,6 +246,29 @@ Value VpaxValueFactory::CreateColumnHierarchyValue(
     return Value::STRUCT(hierarchy_values);
 }
 
+Value VpaxValueFactory::CreatePartitionValue(
+    const std::string &table_name,
+    const std::string &partition_name,
+    const std::string &query_definition,
+    int64_t segment_count,
+    int64_t record_count,
+    int64_t records_per_segment,
+    const std::string &refreshed_time,
+    const std::string &refresh_bookmark) {
+    
+    child_list_t<Value> partition_values;
+    partition_values.push_back(make_pair("TableName", Value(table_name)));
+    partition_values.push_back(make_pair("PartitionName", Value(partition_name)));
+    partition_values.push_back(make_pair("QueryDefinition", Value(query_definition)));
+    partition_values.push_back(make_pair("SegmentCount", Value::BIGINT(segment_count)));
+    partition_values.push_back(make_pair("RecordCount", Value::BIGINT(record_count)));
+    partition_values.push_back(make_pair("RecordsPerSegment", Value::BIGINT(records_per_segment)));
+    partition_values.push_back(make_pair("RefreshedTime", Value(refreshed_time)));
+    partition_values.push_back(make_pair("RefreshBookmark", Value(refresh_bookmark)));
+    
+    return Value::STRUCT(partition_values);
+}
+
 Value VpaxValueFactory::CreateErrorValue(
     const std::string &message,
     const std::string &file_name,

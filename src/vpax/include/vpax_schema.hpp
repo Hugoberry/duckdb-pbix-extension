@@ -18,6 +18,7 @@ public:
     static LogicalType CreateColumnSegmentType();
     static LogicalType CreateColumnHierarchyType();
     static LogicalType CreateUserHierarchyType();
+    static LogicalType CreatePartitionType();
     
     // Helper types
     static LogicalType CreateErrorType();
@@ -134,6 +135,17 @@ public:
         const std::string &table_name,
         const std::string &structure_name,
         int64_t used_size = 0
+    );
+    
+    static Value CreatePartitionValue(
+        const std::string &table_name,
+        const std::string &partition_name,
+        const std::string &query_definition = "",
+        int64_t segment_count = 0,
+        int64_t record_count = 0,
+        int64_t records_per_segment = 0,
+        const std::string &refreshed_time = "",
+        const std::string &refresh_bookmark = ""
     );
     
     // Error value

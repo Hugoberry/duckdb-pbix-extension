@@ -35,6 +35,7 @@ public:
     std::vector<Value> BuildColumnSegments();
     std::vector<Value> BuildColumnHierarchies();
     std::vector<Value> BuildUserHierarchies();
+    std::vector<Value> BuildPartitions();
     std::vector<Value> BuildTablePermissions();  // Empty for now
     std::vector<Value> BuildCalculationItems();  // Empty for now
     

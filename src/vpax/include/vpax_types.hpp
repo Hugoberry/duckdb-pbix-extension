@@ -39,6 +39,7 @@ public:
     static VpaxDataType IntToDataType(int type_id);
     static bool CheckIfTableIsReferenced(class SQLiteDB &db, const std::string &table_name);
     static bool CheckIfColumnIsReferenced(class SQLiteDB &db, const std::string &table_name, const std::string &column_name);
+    static std::string WindowsFileTimeToISO8601(int64_t windows_ticks);
 };
 
 // Error handling

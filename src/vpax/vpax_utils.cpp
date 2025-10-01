@@ -74,6 +74,30 @@ bool VpaxUtils::CheckIfTableIsReferenced(SQLiteDB &db, const std::string &table_
     return false;
 }
 
+std::string VpaxUtils::WindowsFileTimeToISO8601(int64_t windows_ticks) {
+    if (windows_ticks <= 0) {
+        return "";
+    }
+    
+    // Windows epoch starts at 1601-01-01, Unix epoch at 1970-01-01
+    // Windows file time is in 100-nanosecond intervals
+    const int64_t WINDOWS_TICK = 10000000; // 100-nanosecond intervals per second
+    const int64_t SEC_TO_UNIX_EPOCH = 11644473600LL; // Seconds between 1601 and 1970
+    
+    int64_t unix_seconds = (windows_ticks / WINDOWS_TICK) - SEC_TO_UNIX_EPOCH;
+    
+    // Convert to ISO 8601 format
+    time_t time = static_cast<time_t>(unix_seconds);
+    struct tm *tm_info = gmtime(&time);
+    if (!tm_info) {
+        return "";
+    }
+    
+    char buffer[32];
+    strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", tm_info);
+    return std::string(buffer);
+}
+
 bool VpaxUtils::CheckIfColumnIsReferenced(SQLiteDB &db, const std::string &table_name, const std::string &column_name) {
     try {
         std::string ref_sql = R"(
