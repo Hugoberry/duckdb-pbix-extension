@@ -188,51 +188,35 @@ void VpaxBuilder::PreFetchData(PreFetchedData &data) {
 }
 
 Value VpaxBuilder::BuildVpax() {
-    try {
-        // Pre-fetch all data once
-        PreFetchedData prefetched;
-        PreFetchData(prefetched);
+
+    // Pre-fetch all data once
+    PreFetchedData prefetched;
+    PreFetchData(prefetched);
+    
+    // Build all sections using pre-fetched data
+    auto tables = BuildTables(prefetched);
+    auto columns = BuildColumns(prefetched);
+    auto measures = BuildMeasures();
+    auto relationships = BuildRelationships();
+    auto column_hierarchies = BuildColumnHierarchies();
+    auto user_hierarchies = BuildUserHierarchies(prefetched);
+    auto partitions = BuildPartitions();
+    
+    // Create the main VPAX structure
+    child_list_t<Value> vpax_values;
+    vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), vector<Value>(tables.begin(), tables.end()))));
+    vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
+    vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
+    vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
+    vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
+    vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
+    vpax_values.push_back(make_pair("Partitions", Value::LIST(VpaxSchema::CreatePartitionType(), vector<Value>(partitions.begin(), partitions.end()))));
+    vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
+    vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
+    
+    return Value::STRUCT(vpax_values);
         
-        // Build all sections using pre-fetched data
-        auto tables = BuildTables(prefetched);
-        auto columns = BuildColumns(prefetched);
-        auto measures = BuildMeasures();
-        auto relationships = BuildRelationships();
-        auto column_hierarchies = BuildColumnHierarchies();
-        auto user_hierarchies = BuildUserHierarchies(prefetched);
-        auto partitions = BuildPartitions();
-        
-        // Create the main VPAX structure
-        child_list_t<Value> vpax_values;
-        vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), vector<Value>(tables.begin(), tables.end()))));
-        vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), vector<Value>(columns.begin(), columns.end()))));
-        vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), vector<Value>(measures.begin(), measures.end()))));
-        vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
-        vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), vector<Value>(column_hierarchies.begin(), column_hierarchies.end()))));
-        vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
-        vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
-        vpax_values.push_back(make_pair("Partitions", Value::LIST(VpaxSchema::CreatePartitionType(), vector<Value>(partitions.begin(), partitions.end()))));
-        vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
-        vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
-        
-        return Value::STRUCT(vpax_values);
-        
-   } catch (const std::exception &e) {
-        // Create empty VPAX structure with correct type
-        child_list_t<Value> empty_vpax_values;
-        empty_vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), std::vector<Value>())));
-        empty_vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), std::vector<Value>())));
-        empty_vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), std::vector<Value>())));
-        empty_vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
-        empty_vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
-        empty_vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), std::vector<Value>())));
-        empty_vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), std::vector<Value>())));
-        empty_vpax_values.push_back(make_pair("Partitions", Value::LIST(VpaxSchema::CreatePartitionType(), std::vector<Value>())));
-        empty_vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
-        empty_vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
-        
-        return Value::STRUCT(empty_vpax_values);
-    }
 }
 
 std::vector<Value> VpaxBuilder::BuildTables(const PreFetchedData &prefetched) {

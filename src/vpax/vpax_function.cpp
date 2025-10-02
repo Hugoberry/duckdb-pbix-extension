@@ -39,19 +39,8 @@ void VpaxFunction::Execute(DataChunk &args, ExpressionState &state, Vector &resu
             
         } catch (const std::exception &e) {
            // Create empty VPAX structure on error (maintains type consistency)
-            child_list_t<Value> empty_vpax_values;
-            empty_vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), std::vector<Value>())));
-            empty_vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), std::vector<Value>())));
-            empty_vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), std::vector<Value>())));
-            empty_vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
-            empty_vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
-            empty_vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), std::vector<Value>())));
-            empty_vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), std::vector<Value>())));
-            empty_vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
-            empty_vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
-            
-            Value empty_vpax = Value::STRUCT(empty_vpax_values);
-            result.SetValue(i, empty_vpax);
+           throw InvalidInputException("Failed to call pbix2vpax() for file '%s': %s", 
+                                      file_name.c_str(), e.what()); 
         }
     }
 }
