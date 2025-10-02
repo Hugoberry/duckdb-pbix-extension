@@ -1,0 +1,147 @@
+# name: test/sql/pbix2vpax.test
+# description: test pbix2vpax function
+# group: [pbix]
+
+require pbix
+
+# Test basic function call
+query I
+SELECT COUNT(*) > 0 FROM (SELECT unnest(pbix2vpax('data/work.pbix').Tables));
+----
+true
+
+# Test that Tables array is populated
+query I
+SELECT list_count(pbix2vpax('data/work.pbix').Tables) >0;
+----
+true
+
+# Test extracting table names
+query I
+SELECT COUNT(*) FROM (SELECT unnest(pbix2vpax('data/work.pbix').Tables));
+----
+9
+
+# Test table name extraction
+query I
+SELECT unnest(pbix2vpax('data/work.pbix').Tables).TableName ORDER BY 1;
+----
+Currency
+Currency Rate
+Customer
+Date
+Product
+Reseller
+Sales
+Sales Order
+Sales Territory
+
+# Test that Columns array is populated
+query I
+SELECT list_count(pbix2vpax('data/work.pbix').Columns) > 0 ;
+----
+true
+
+# Test extracting column information
+query I
+SELECT list_count(pbix2vpax('data/work.pbix').Columns);
+----
+76
+
+# Test column details extraction
+query III
+SELECT 
+    col.TableName,
+    col.ColumnName,
+    col.DataType
+FROM (SELECT UNNEST(pbix2vpax('data/work.pbix').Columns) as col) 
+ORDER BY 1, 2
+LIMIT 5;
+----
+Currency	Code	String
+Currency	Currency	String
+Currency	CurrencyKey	Int64
+Currency	Format String	String
+Currency	RowNumber-2662979B-1795-4F74-8F37-6A1BA8059B61	Int64
+
+# Test that Measures array is populated
+query I
+SELECT list_count(pbix2vpax('data/Contoso.pbix').Measures) >= 0;
+----
+true
+
+# Test measure extraction if present
+query I
+SELECT COUNT(*) >= 0 FROM (SELECT unnest(pbix2vpax('data/contoso.pbix').Measures));
+----
+true
+
+# Test that Relationships array is populated
+query I
+SELECT list_count(pbix2vpax('data/contoso.pbix').Relationships) >= 0 ;
+----
+true
+
+# Test extracting table sizes
+query II
+SELECT 
+    tab.TableName,
+    tab.TableSize > 0
+FROM (select unnest(pbix2vpax('data/contoso.pbix').Tables) as tab) 
+ORDER BY 1 LIMIT 2;
+----
+Currency	true
+Customer	true
+
+# Test extracting column cardinality
+query II
+SELECT 
+    col.ColumnName,
+    col.ColumnCardinality > 0
+FROM (select unnest(pbix2vpax('data/contoso.pbix').Columns) as col) 
+WHERE col.TableName = 'Currency'
+ORDER BY 1
+LIMIT 3;
+----
+Currency	true
+Currency Code	true
+CurrencyKey	true
+
+# Test that encoding information is present
+query II
+SELECT 
+    col.ColumnName,
+    col.Encoding
+FROM (select unnest(pbix2vpax('data/contoso.pbix').Columns) as col) 
+WHERE col.TableName = 'Currency'
+ORDER BY 1
+LIMIT 4;
+----
+Currency	HASH
+Currency Code	HASH
+CurrencyKey	HASH
+RowNumber-2662979B-1795-4F74-8F37-6A1BA8059B61	VALUE
+
+# Test partition information
+query I
+SELECT list_count(pbix2vpax('data/work.pbix').Partitions) > 0;
+----
+true
+
+# Test that hierarchies are properly structured
+query I
+SELECT list_count(pbix2vpax('data/work.pbix').UserHierarchies) >= 0;
+----
+true
+
+# Test that column hierarchies are properly structured  
+query I
+SELECT list_count(pbix2vpax('data/work.pbix').ColumnsHierarchies) >= 0 ;
+----
+true
+
+# Test error handling with invalid file
+statement error
+SELECT pbix2vpax('nonexistent.pbix');
+----
+

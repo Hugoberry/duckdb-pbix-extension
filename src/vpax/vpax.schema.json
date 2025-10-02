@@ -1,0 +1,508 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Generated schema for Root",
+  "type": "object",
+  "properties": {
+    "Tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "TableName": {
+            "type": "string"
+          },
+          "TableExpression": {},
+          "RowsCount": {
+            "type": "number"
+          },
+          "ReferentialIntegrityViolationCount": {
+            "type": "number"
+          },
+          "IsHidden": {
+            "type": "boolean"
+          },
+          "IsPrivate": {
+            "type": "boolean"
+          },
+          "IsLocalDateTable": {
+            "type": "boolean"
+          },
+          "IsTemplateDateTable": {
+            "type": "boolean"
+          },
+          "Description": {
+            "type": "string"
+          },
+          "ColumnsSize": {
+            "type": "number"
+          },
+          "TableSize": {
+            "type": "number"
+          },
+          "RelationshipsSize": {
+            "type": "number"
+          },
+          "UserHierarchiesSize": {
+            "type": "number"
+          },
+          "IsReferenced": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "TableName",
+          "TableExpression",
+          "RowsCount",
+          "ReferentialIntegrityViolationCount",
+          "IsHidden",
+          "IsPrivate",
+          "IsLocalDateTable",
+          "IsTemplateDateTable",
+          "Description",
+          "ColumnsSize",
+          "TableSize",
+          "RelationshipsSize",
+          "UserHierarchiesSize",
+          "IsReferenced"
+        ]
+      }
+    },
+    "Columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ColumnName": {
+            "type": "string"
+          },
+          "TableName": {
+            "type": "string"
+          },
+          "FullColumnName": {
+            "type": "string"
+          },
+          "ColumnCardinality": {
+            "type": "number"
+          },
+          "DataType": {
+            "type": "string"
+          },
+          "ColumnType": {
+            "type": "string"
+          },
+          "IsHidden": {
+            "type": "boolean"
+          },
+          "Encoding": {
+            "type": "string"
+          },
+          "ColumnExpression": {},
+          "DisplayFolder": {
+            "type": "string"
+          },
+          "Description": {
+            "type": "string"
+          },
+          "FormatString": {
+            "type": "string"
+          },
+          "EncodingHint": {
+            "type": "string"
+          },
+          "IsAvailableInMDX": {
+            "type": "boolean"
+          },
+          "IsKey": {
+            "type": "boolean"
+          },
+          "IsNullable": {
+            "type": "boolean"
+          },
+          "IsUnique": {
+            "type": "boolean"
+          },
+          "KeepUniqueRows": {
+            "type": "boolean"
+          },
+          "SortByColumnName": {
+            "type": "string"
+          },
+          "State": {
+            "type": "string"
+          },
+          "IsRowNumber": {
+            "type": "boolean"
+          },
+          "IsReferenced": {
+            "type": "boolean"
+          },
+          "DictionarySize": {
+            "type": "number"
+          },
+          "DataSize": {
+            "type": "number"
+          },
+          "HierarchiesSize": {
+            "type": "number"
+          },
+          "TotalSize": {
+            "type": "number"
+          },
+          "Selectivity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ColumnName",
+          "TableName",
+          "FullColumnName",
+          "ColumnCardinality",
+          "DataType",
+          "ColumnType",
+          "IsHidden",
+          "Encoding",
+          "ColumnExpression",
+          "DisplayFolder",
+          "Description",
+          "FormatString",
+          "EncodingHint",
+          "IsAvailableInMDX",
+          "IsKey",
+          "IsNullable",
+          "IsUnique",
+          "KeepUniqueRows",
+          "State",
+          "IsRowNumber",
+          "IsReferenced",
+          "DictionarySize",
+          "DataSize",
+          "HierarchiesSize",
+          "TotalSize"
+        ]
+      }
+    },
+    "Measures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "MeasureName": {
+            "type": "string"
+          },
+          "TableName": {
+            "type": "string"
+          },
+          "FullMeasureName": {
+            "type": "string"
+          },
+          "MeasureExpression": {
+            "type": "string"
+          },
+          "DisplayFolder": {
+            "type": "string"
+          },
+          "Description": {
+            "type": "string"
+          },
+          "IsHidden": {
+            "type": "boolean"
+          },
+          "DataType": {
+            "type": "string"
+          },
+          "DetailRowsExpression": {},
+          "FormatString": {
+            "type": "string"
+          },
+          "KpiStatusExpression": {},
+          "KpiTargetExpression": {},
+          "KpiTargetFormatString": {},
+          "KpiTrendExpression": {},
+          "IsReferenced": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "MeasureName",
+          "TableName",
+          "FullMeasureName",
+          "MeasureExpression",
+          "DisplayFolder",
+          "Description",
+          "IsHidden",
+          "DataType",
+          "DetailRowsExpression",
+          "FormatString",
+          "KpiStatusExpression",
+          "KpiTargetExpression",
+          "KpiTargetFormatString",
+          "KpiTrendExpression",
+          "IsReferenced"
+        ]
+      }
+    },
+    "ColumnsSegments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ColumnName": {
+            "type": "string"
+          },
+          "TableName": {
+            "type": "string"
+          },
+          "FullColumnName": {
+            "type": "string"
+          },
+          "PartitionName": {
+            "type": "string"
+          },
+          "PartitionState": {
+            "type": "string"
+          },
+          "PartitionType": {
+            "type": "string"
+          },
+          "PartitionMode": {
+            "type": "string"
+          },
+          "RefreshedTime": {
+            "type": "string"
+          },
+          "SegmentNumber": {
+            "type": "number"
+          },
+          "TablePartitionNumber": {
+            "type": "number"
+          },
+          "SegmentRows": {
+            "type": "number"
+          },
+          "UsedSize": {
+            "type": "number"
+          },
+          "CompressionType": {
+            "type": "string"
+          },
+          "BitsCount": {
+            "type": "number"
+          },
+          "BookmarkBitsCount": {
+            "type": "number"
+          },
+          "VertipaqState": {
+            "type": "string"
+          },
+          "IsPageable": {},
+          "IsResident": {},
+          "Temperature": {},
+          "LastAccessed": {}
+        },
+        "required": [
+          "ColumnName",
+          "TableName",
+          "FullColumnName",
+          "PartitionName",
+          "PartitionState",
+          "PartitionType",
+          "PartitionMode",
+          "RefreshedTime",
+          "SegmentNumber",
+          "TablePartitionNumber",
+          "SegmentRows",
+          "UsedSize",
+          "CompressionType",
+          "BitsCount",
+          "BookmarkBitsCount",
+          "VertipaqState",
+          "IsPageable",
+          "IsResident",
+          "Temperature",
+          "LastAccessed"
+        ]
+      }
+    },
+    "ColumnsHierarchies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ColumnName": {
+            "type": "string"
+          },
+          "TableName": {
+            "type": "string"
+          },
+          "FullColumnName": {
+            "type": "string"
+          },
+          "StructureName": {
+            "type": "string"
+          },
+          "SegmentNumber": {
+            "type": "number"
+          },
+          "TablePartitionNumber": {
+            "type": "number"
+          },
+          "UsedSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ColumnName",
+          "TableName",
+          "FullColumnName",
+          "StructureName",
+          "SegmentNumber",
+          "TablePartitionNumber",
+          "UsedSize"
+        ]
+      }
+    },
+    "UserHierarchies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "TableName": {
+            "type": "string"
+          },
+          "UserHierarchyName": {
+            "type": "string"
+          },
+          "IsHidden": {
+            "type": "boolean"
+          },
+          "UsedSize": {
+            "type": "number"
+          },
+          "Levels": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "TableName",
+          "UserHierarchyName",
+          "IsHidden",
+          "UsedSize",
+          "Levels"
+        ]
+      }
+    },
+    "Relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "FromTableName": {
+            "type": "string"
+          },
+          "FromFullColumnName": {
+            "type": "string"
+          },
+          "FromCardinality": {
+            "type": "number"
+          },
+          "FromCardinalityType": {
+            "type": "string"
+          },
+          "ToTableName": {
+            "type": "string"
+          },
+          "ToFullColumnName": {
+            "type": "string"
+          },
+          "ToCardinality": {
+            "type": "number"
+          },
+          "ToCardinalityType": {
+            "type": "string"
+          },
+          "RelyOnReferentialIntegrity": {
+            "type": "boolean"
+          },
+          "JoinOnDateBehavior": {
+            "type": "string"
+          },
+          "CrossFilteringBehavior": {
+            "type": "string"
+          },
+          "RelationshipType": {
+            "type": "string"
+          },
+          "IsActive": {
+            "type": "boolean"
+          },
+          "RelationshipName": {
+            "type": "string"
+          },
+          "SecurityFilteringBehavior": {
+            "type": "string"
+          },
+          "UsedSizeFrom": {
+            "type": "number"
+          },
+          "UsedSizeTo": {
+            "type": "number"
+          },
+          "UsedSize": {
+            "type": "number"
+          },
+          "MissingKeys": {
+            "type": "number"
+          },
+          "InvalidRows": {
+            "type": "number"
+          },
+          "OneToManyRatio": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "FromTableName",
+          "FromFullColumnName",
+          "FromCardinality",
+          "FromCardinalityType",
+          "ToTableName",
+          "ToFullColumnName",
+          "ToCardinality",
+          "ToCardinalityType",
+          "RelyOnReferentialIntegrity",
+          "JoinOnDateBehavior",
+          "CrossFilteringBehavior",
+          "RelationshipType",
+          "IsActive",
+          "RelationshipName",
+          "SecurityFilteringBehavior",
+          "UsedSizeFrom",
+          "UsedSizeTo",
+          "UsedSize",
+          "MissingKeys",
+          "InvalidRows",
+          "OneToManyRatio"
+        ]
+      }
+    },
+    "TablePermissions": {
+      "type": "array",
+      "items": {}
+    },
+    "CalculationItems": {
+      "type": "array",
+      "items": {}
+    }
+  },
+  "required": [
+    "Tables",
+    "Columns",
+    "Measures",
+    "ColumnsSegments",
+    "ColumnsHierarchies",
+    "UserHierarchies",
+    "Relationships",
+    "TablePermissions",
+    "CalculationItems"
+  ]
+}

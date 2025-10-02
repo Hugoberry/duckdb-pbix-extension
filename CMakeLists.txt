@@ -32,6 +32,12 @@ else()
     add_definitions(-DKS_STR_ENCODING_ICONV)
 endif()
 
+include_directories(src/include)
+include_directories(src/abf/include)
+include_directories(src/vertipaq/include)
+include_directories(src/vpax/include)
+
+
 project(${TARGET_NAME})
 include_directories(src/include)
 include_directories(third_party/sqlite)
@@ -73,6 +79,13 @@ SET(VERTIPAQ_SOURCES
     src/vertipaq/column_data_dictionary.cpp
     src/vertipaq/huffman_decoder.cpp)
 
+SET(VPAX_SOURCES
+    src/vpax/vpax_schema.cpp
+    src/vpax/vpax_value_factory.cpp
+    src/vpax/vpax_utils.cpp
+    src/vpax/vpax_builder.cpp
+    src/vpax/vpax_function.cpp)
+
 set(EXTENSION_SOURCES 
     src/pbix_extension.cpp
     src/pbix_scanner.cpp
@@ -85,7 +98,8 @@ set(EXTENSION_SOURCES
     ${TINYXML2_SOURCES}
     ${XPRESS9_SOURCES}
     ${ABF_SOURCES}
-    ${VERTIPAQ_SOURCES})
+    ${VERTIPAQ_SOURCES}
+    ${VPAX_SOURCES})
 
 # find_package(Iconv REQUIRED)
 # if(ICONV_FOUND)
