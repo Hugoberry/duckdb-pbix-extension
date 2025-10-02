@@ -8,6 +8,14 @@ This duckdb extension, pbix, allows you to parse the data model embedded in Powe
 
 For a pure Python implementation of the pbix parser, check out this library 👉 [PBIXray](https://github.com/Hugoberry/pbixray).
 
+## Features
+
+The extension provides three main functions:
+
+1. **`pbix_meta()`** - Access metadata tables from the data model (table function)
+2. **`pbix_read()`** - Read data from tables in the data model (table function)
+3. **`pbix2vpax()`** - Generate comprehensive VPAX analysis of the entire data model (scalar function)
+
 ## Building
 ### Build steps
 Now to build the extension, run:
@@ -71,6 +79,317 @@ D SELECT
 │         241 ┆ Specialty Bike Shop  ┆ Vale Riding Supplies            ┆ AW00000241  │
 └─────────────┴──────────────────────┴─────────────────────────────────┴─────────────┘
 ```
+### pbix2vpax()
+Generates a comprehensive VPAX (VertiPaq Analyzer eXport) analysis of the entire Power BI data model. This scalar function returns a structured analysis of tables, columns, measures, relationships, hierarchies, and partitions with detailed size and cardinality information.
+
+**Syntax:**
+```sql
+pbix2vpax(filename)
+```
+
+**Returns:** A STRUCT containing:
+- `Tables` - List of all tables with size and row count information
+- `Columns` - Detailed column metadata including cardinality, encoding, and sizes
+- `Measures` - DAX measures with expressions and formatting
+- `Relationships` - Relationship definitions with cardinality information
+- `ColumnsHierarchies` - Column-level hierarchy structures
+- `UserHierarchies` - User-defined hierarchies
+- `Partitions` - Partition information including refresh times
+- `ColumnsSegments` - (Reserved for future use)
+- `TablePermissions` - (Reserved for future use)
+- `CalculationItems` - (Reserved for future use)
+
+#### Basic Usage
+
+**Get list of all tables:**
+```sql
+SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Tables).TableName;
+```
+
+**Get complete VPAX structure:**
+```sql
+SELECT pbix2vpax('Adventure Works DW 2020.pbix');
+```
+
+**Count tables and columns:**
+```sql
+SELECT 
+    list_count(pbix2vpax('Adventure Works DW 2020.pbix').Tables) as table_count,
+    list_count(pbix2vpax('Adventure Works DW 2020.pbix').Columns) as column_count;
+```
+
+**Analyze table sizes:**
+```sql
+SELECT 
+    tab.TableName,
+    tab.RowsCount,
+    tab.TableSize / 1024.0 / 1024.0 as TableSizeMB,
+    tab.ColumnsSize / 1024.0 / 1024.0 as ColumnsSizeMB,
+    tab.RelationshipsSize / 1024.0 / 1024.0 as RelationshipsSizeMB
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Tables) as tab)
+ORDER BY tab.TableSize DESC;
+```
+
+**Find largest columns:**
+```sql
+SELECT 
+    col.TableName,
+    col.ColumnName,
+    col.DataType,
+    col.ColumnCardinality,
+    col.TotalSize / 1024.0 / 1024.0 as TotalSizeMB,
+    col.DictionarySize / 1024.0 / 1024.0 as DictionarySizeMB,
+    col.Encoding
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Columns) as col)
+ORDER BY col.TotalSize DESC
+LIMIT 10;
+```
+
+**Analyze measures by table:**
+```sql
+SELECT 
+    meas.TableName,
+    COUNT(*) as MeasureCount,
+    STRING_AGG(meas.MeasureName, ', ') as Measures
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Measures) as meas)
+GROUP BY meas.TableName
+ORDER BY MeasureCount DESC;
+```
+
+**Examine relationships:**
+```sql
+SELECT 
+    rel.FromTableName,
+    rel.FromFullColumnName,
+    rel.ToTableName,
+    rel.ToFullColumnName,
+    rel.FromCardinalityType,
+    rel.ToCardinalityType,
+    rel.IsActive,
+    rel.CrossFilteringBehavior,
+    rel.UsedSize / 1024.0 / 1024.0 as RelationshipSizeMB
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Relationships) as rel)
+ORDER BY rel.UsedSize DESC;
+```
+
+**Check encoding efficiency:**
+```sql
+SELECT 
+    col.TableName,
+    col.ColumnName,
+    col.Encoding,
+    col.ColumnCardinality,
+    col.TotalSize / 1024.0 / 1024.0 as SizeMB,
+    CASE 
+        WHEN col.ColumnCardinality > 0 
+        THEN col.TotalSize::DOUBLE / col.ColumnCardinality 
+        ELSE 0 
+    END as BytesPerValue
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Columns) as col)
+WHERE col.ColumnCardinality > 0
+ORDER BY BytesPerValue DESC
+LIMIT 10;
+```
+
+**Analyze hierarchies:**
+```sql
+SELECT 
+    hier.TableName,
+    hier.UserHierarchyName,
+    hier.Levels,
+    hier.UsedSize / 1024.0 / 1024.0 as HierarchySizeMB
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').UserHierarchies) as hier)
+ORDER BY hier.UsedSize DESC;
+```
+
+**Partition refresh status:**
+```sql
+SELECT 
+    part.TableName,
+    part.PartitionName,
+    part.RecordCount,
+    part.SegmentCount,
+    part.RefreshedTime,
+    part.RecordsPerSegment
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Partitions) as part)
+ORDER BY part.RecordCount DESC;
+```
+
+#### Advanced Analysis Examples
+
+**Model size breakdown:**
+```sql
+WITH vpax AS (
+    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
+),
+table_sizes AS (
+    SELECT 
+        UNNEST(vpax.analysis.Tables).TableName as TableName,
+        UNNEST(vpax.analysis.Tables).TableSize as TableSize
+    FROM vpax
+)
+SELECT 
+    TableName,
+    TableSize / 1024.0 / 1024.0 as SizeMB,
+    100.0 * TableSize / SUM(TableSize) OVER () as PercentOfTotal
+FROM table_sizes
+ORDER BY TableSize DESC;
+```
+
+**High cardinality columns analysis:**
+```sql
+WITH vpax AS (
+    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
+)
+SELECT 
+    col.TableName,
+    col.ColumnName,
+    col.ColumnCardinality,
+    col.TotalSize / 1024.0 / 1024.0 as SizeMB,
+    col.Encoding,
+    CASE 
+        WHEN col.ColumnCardinality > 1000000 THEN 'Very High'
+        WHEN col.ColumnCardinality > 100000 THEN 'High'
+        WHEN col.ColumnCardinality > 10000 THEN 'Medium'
+        ELSE 'Low'
+    END as CardinalityLevel
+FROM (SELECT UNNEST(vpax.analysis.Columns) as col FROM vpax)
+WHERE col.ColumnCardinality > 0
+ORDER BY col.ColumnCardinality DESC;
+```
+
+**Relationship network analysis:**
+```sql
+WITH vpax AS (
+    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
+)
+SELECT 
+    rel.FromTableName,
+    rel.ToTableName,
+    COUNT(*) as RelationshipCount,
+    SUM(rel.UsedSize) / 1024.0 / 1024.0 as TotalRelationshipSizeMB
+FROM (SELECT UNNEST(vpax.analysis.Relationships) as rel FROM vpax)
+GROUP BY rel.FromTableName, rel.ToTableName
+ORDER BY RelationshipCount DESC;
+```
+
+**Measure catalog with expressions:**
+```sql
+SELECT 
+    meas.TableName,
+    meas.MeasureName,
+    meas.DataType,
+    meas.MeasureExpression,
+    meas.FormatString,
+    meas.IsHidden
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Measures) as meas)
+WHERE NOT meas.IsHidden
+ORDER BY meas.TableName, meas.MeasureName;
+```
+
+**Column type distribution:**
+```sql
+WITH vpax AS (
+    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
+)
+SELECT 
+    col.DataType,
+    COUNT(*) as ColumnCount,
+    SUM(col.TotalSize) / 1024.0 / 1024.0 as TotalSizeMB,
+    AVG(col.ColumnCardinality) as AvgCardinality
+FROM (SELECT UNNEST(vpax.analysis.Columns) as col FROM vpax)
+GROUP BY col.DataType
+ORDER BY ColumnCount DESC;
+```
+
+**Export to JSON for external analysis:**
+```sql
+COPY (
+    SELECT to_json(pbix2vpax('Adventure Works DW 2020.pbix'))
+) TO 'model_analysis.json';
+```
+
+**Create a summary report:**
+```sql
+WITH vpax AS (
+    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
+)
+SELECT 
+    'Model Summary' as Section,
+    list_count(vpax.analysis.Tables) as TableCount,
+    list_count(vpax.analysis.Columns) as ColumnCount,
+    list_count(vpax.analysis.Measures) as MeasureCount,
+    list_count(vpax.analysis.Relationships) as RelationshipCount,
+    list_count(vpax.analysis.UserHierarchies) as HierarchyCount,
+    (SELECT SUM(tab.TableSize) FROM (SELECT UNNEST(vpax.analysis.Tables) as tab)) / 1024.0 / 1024.0 as TotalModelSizeMB
+FROM vpax;
+```
+
+**Compare multiple models:**
+```sql
+WITH 
+model_a AS (
+    SELECT 
+        'Model A' as ModelName,
+        UNNEST(pbix2vpax('model_a.pbix').Tables).TableName as TableName,
+        UNNEST(pbix2vpax('model_a.pbix').Tables).RowsCount as RowCount,
+        UNNEST(pbix2vpax('model_a.pbix').Tables).TableSize as TableSize
+),
+model_b AS (
+    SELECT 
+        'Model B' as ModelName,
+        UNNEST(pbix2vpax('model_b.pbix').Tables).TableName as TableName,
+        UNNEST(pbix2vpax('model_b.pbix').Tables).RowsCount as RowCount,
+        UNNEST(pbix2vpax('model_b.pbix').Tables).TableSize as TableSize
+)
+SELECT * FROM model_a
+UNION ALL
+SELECT * FROM model_b
+ORDER BY ModelName, TableSize DESC;
+```
+
+**Find columns that could benefit from optimization:**
+```sql
+WITH vpax AS (
+    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
+)
+SELECT 
+    col.TableName,
+    col.ColumnName,
+    col.Encoding,
+    col.ColumnCardinality,
+    col.TotalSize / 1024.0 / 1024.0 as SizeMB,
+    CASE 
+        WHEN col.Encoding = 'HASH' AND col.ColumnCardinality < 1000 
+        THEN 'Consider VALUE encoding'
+        WHEN col.ColumnCardinality > 1000000 
+        THEN 'Very high cardinality - review if needed'
+        ELSE 'OK'
+    END as Recommendation
+FROM (SELECT UNNEST(vpax.analysis.Columns) as col FROM vpax)
+WHERE col.TotalSize > 1048576  -- Larger than 1MB
+ORDER BY col.TotalSize DESC
+LIMIT 20;
+```
+
+**Relationship health check:**
+```sql
+SELECT 
+    rel.FromTableName,
+    rel.ToTableName,
+    rel.RelationshipType,
+    rel.IsActive,
+    rel.CrossFilteringBehavior,
+    CASE 
+        WHEN NOT rel.IsActive THEN 'Inactive relationship'
+        WHEN rel.CrossFilteringBehavior = 'BothDirections' THEN 'Bidirectional - review performance'
+        WHEN NOT rel.RelyOnReferentialIntegrity THEN 'RI not assumed - may impact performance'
+        ELSE 'OK'
+    END as HealthCheck
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Relationships) as rel)
+ORDER BY rel.FromTableName, rel.ToTableName;
+```
+
 ## Running the tests
 Different tests can be created for DuckDB extensions. The primary way of testing DuckDB extensions should be the SQL tests in `./test/sql`. These SQL tests can be run using:
 ```sh
@@ -111,3 +430,5 @@ LOAD pbix
 * ~~pbix_read() doesn't let you select only specific columns; you need to CTE to pick the output columns~~
 * ~~pbix_read() currently limited to 2048 records~~
 * pbix_read() will decompress the entire model in memory
+* pbix2vpax() currently doesn't populate ColumnsSegments (segment-level detail)
+* pbix2vpax() selectivity calculation is not yet implemented
