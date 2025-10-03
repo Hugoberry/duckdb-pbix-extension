@@ -62,22 +62,59 @@ void VpaxBuilder::PreFetchData(PreFetchedData &data) {
         data.table_files[table_id].push_back(filename);
     }
     
-    // 2. Pre-fetch all dictionary sizes in one query
-    std::string dict_sizes_sql = R"(
+    // 2. Pre-fetch all dictionary sizes
+    // First try with ds.Size column (preferred if available and not null)
+    std::string dict_sizes_with_size_sql = R"(
         SELECT 
             c.ID as ColumnID,
-            COALESCE(ds.Size, 0) as DictSize
+            ds.Size as DictSize,
+            sfd.FileName AS DictionaryFileName
         FROM column c
         LEFT JOIN ColumnStorage cs ON c.id = cs.ColumnID
         LEFT JOIN DictionaryStorage ds ON ds.ColumnStorageID = cs.ID
+        LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
         WHERE c.Type = 1
     )";
     
-    stmt = db_.Prepare(dict_sizes_sql);
-    while (stmt.Step()) {
-        int column_id = stmt.GetValue<int>(0);
-        int64_t dict_size = stmt.GetValue<int64_t>(1);
-        data.dictionary_sizes[column_id] = dict_size;
+    bool has_size_column = db_.TryPrepare(dict_sizes_with_size_sql, stmt);
+    
+    if (has_size_column) {
+        // Size column exists - use it when available, fall back to filename when NULL
+        while (stmt.Step()) {
+            int column_id = stmt.GetValue<int>(0);
+            int64_t dict_size = 0;
+            
+            // Check if Size is not NULL
+            if (stmt.GetType(1) != SQLITE_NULL) {
+                dict_size = stmt.GetValue<int64_t>(1);
+            } else if (stmt.GetType(2) != SQLITE_NULL) {
+                // Size is NULL, try to get size from dictionary filename
+                std::string dict_filename = stmt.GetValue<std::string>(2);
+                dict_size = GetFileSizeByName(dict_filename);
+            }
+            
+            data.dictionary_sizes[column_id] = dict_size;
+        }
+    } else {
+        // Size column doesn't exist - fall back to using dictionary filenames
+        std::string dict_files_sql = R"(
+            SELECT 
+                c.ID as ColumnID,
+                sfd.FileName AS DictionaryFileName
+            FROM Column c 
+            JOIN ColumnStorage cs ON c.ColumnStorageID = cs.ID
+            LEFT JOIN DictionaryStorage ds ON ds.ID = cs.DictionaryStorageID
+            LEFT JOIN StorageFile sfd ON sfd.ID = ds.StorageFileID
+            WHERE c.Type = 1 AND sfd.FileName IS NOT NULL
+        )";
+        
+        stmt = db_.Prepare(dict_files_sql);
+        while (stmt.Step()) {
+            int column_id = stmt.GetValue<int>(0);
+            std::string dict_filename = stmt.GetValue<std::string>(1);
+            int64_t dict_size = GetFileSizeByName(dict_filename);
+            data.dictionary_sizes[column_id] = dict_size;
+        }
     }
     
     // 3. Pre-fetch all column IDF files in one query
