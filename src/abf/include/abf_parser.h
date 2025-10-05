@@ -18,10 +18,8 @@
 
 class AbfParser {
 public:
-    static DataModel get_sqlite(duckdb::ClientContext &context,const std::string &path, const int trailing_chunks);
+    static DataModel get_sqlite(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks = 15);
 private:
-    // duckdb::FileHandle *file_handle;
-    // mz_zip_archive zip_archive;
     static void patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t& block_index_iterator);
     static std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, uint64_t offset, int size);
     static std::vector<uint8_t> trim_buffer(const std::vector<uint8_t>& buffer);
@@ -32,6 +30,10 @@ private:
     static std::vector<VertipaqFile> match_logs_and_get_vertipaq_meta(const BackupLog& backupLog, const VirtualDirectory& virtualDirectory);
     static std::vector<uint8_t> decompress_initial_block(duckdb::FileHandle &file_handle, uint64_t &bytes_read, XPress9Wrapper &xpress9_wrapper);
     static std::vector<uint8_t> iterate_and_decompress_blocks(duckdb::FileHandle &file_handle, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, BackupLogHeader virtual_directory, const int trailing_blocks, uint64_t &skip_offset);
+    
+    // Multi-threaded decompression functions
+    static std::vector<uint8_t> decompress_initial_block_multithread(duckdb::FileHandle &file_handle, uint64_t &bytes_read, XPress9Wrapper &xpress9_wrapper, MultiThreadMetadata &metadata);
+    static std::vector<uint8_t> iterate_and_decompress_chunks_multithread(duckdb::FileHandle &file_handle, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, const MultiThreadMetadata &metadata, BackupLogHeader virtual_directory, const int trailing_chunks, uint64_t &skip_offset);
 };
 
 class Header {
@@ -52,7 +54,7 @@ public:
     // Calculate and update the CRC32C for the header
     void update_crc() {
         // Calculate CRC over the header except the crc32 field itself
-        crc32 = Crc32(reinterpret_cast<const uint8_t*>(this), sizeof(Header) - sizeof(crc32),0);
+        crc32 = Crc32(reinterpret_cast<const uint8_t*>(this), sizeof(Header) - sizeof(crc32), 0);
     }
 
     // Serialize this header to a binary stream

@@ -42,11 +42,21 @@ struct DataModel{
 
 using VertipaqFiles = std::map<std::string, VertipaqFile>;
 using VertipaqData = std::map<std::string, VertipaqDetails>;
+struct MultiThreadMetadata {
+    uint64_t main_chunks_per_thread;
+    uint64_t prefix_chunks_per_thread;
+    uint64_t prefix_thread_count;
+    uint64_t main_thread_count;
+    uint64_t chunk_uncompressed_size;
+    
+    static constexpr size_t SIZE = sizeof(uint64_t) * 5; // 40 bytes
+};
 
 // Constants related to ZIP file parsing
 constexpr unsigned char ZIP_LOCAL_FILE_HEADER_FIXED = 26;
 constexpr unsigned char ZIP_LOCAL_FILE_HEADER = 30;
 constexpr unsigned char ABF_XPRESS9_SIGNATURE = 102;
+constexpr unsigned char ABF_MULTITHREAD_METADATA_SIZE = MultiThreadMetadata::SIZE;
 constexpr unsigned char ABF_BACKUP_LOG_HEADER_OFFSET = 72;
 constexpr uint32_t BLOCK_SIZE = 0x200000;
 constexpr unsigned short ABF_BACKUP_LOG_HEADER_SIZE = 0x1000 - ABF_BACKUP_LOG_HEADER_OFFSET;

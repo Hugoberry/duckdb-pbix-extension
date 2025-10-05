@@ -1,8 +1,74 @@
 #include "abf_parser.h"
-// #include "duckdb/common/file_system.hpp"
 
 using namespace tinyxml2;
 using namespace duckdb;
+
+// Signature constants as UTF-16LE byte patterns
+static const std::vector<uint8_t> SINGLE_THREAD_SIGNATURE_BYTES = {
+    0x54, 0x00, 0x68, 0x00, 0x69, 0x00, 0x73, 0x00, 0x20, 0x00, 0x62, 0x00, 0x61, 0x00, 0x63, 0x00,
+    0x6B, 0x00, 0x75, 0x00, 0x70, 0x00, 0x20, 0x00, 0x77, 0x00, 0x61, 0x00, 0x73, 0x00, 0x20, 0x00,
+    0x63, 0x00, 0x72, 0x00, 0x65, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x64, 0x00, 0x20, 0x00,
+    0x75, 0x00, 0x73, 0x00, 0x69, 0x00, 0x6E, 0x00, 0x67, 0x00, 0x20, 0x00, 0x58, 0x00, 0x50, 0x00,
+    0x72, 0x00, 0x65, 0x00, 0x73, 0x00, 0x73, 0x00, 0x39, 0x00, 0x20, 0x00, 0x63, 0x00, 0x6F, 0x00,
+    0x6D, 0x00, 0x70, 0x00, 0x72, 0x00, 0x65, 0x00, 0x73, 0x00, 0x73, 0x00, 0x69, 0x00, 0x6F, 0x00,
+    0x6E, 0x00, 0x2E, 0x00
+}; // "This backup was created using XPress9 compression."
+
+static const std::vector<uint8_t> MULTI_THREAD_SIGNATURE_BYTES = {
+    0x54, 0x00, 0x68, 0x00, 0x69, 0x00, 0x73, 0x00, 0x20, 0x00, 0x62, 0x00, 0x61, 0x00, 0x63, 0x00,
+    0x6B, 0x00, 0x75, 0x00, 0x70, 0x00, 0x20, 0x00, 0x77, 0x00, 0x61, 0x00, 0x73, 0x00, 0x20, 0x00,
+    0x63, 0x00, 0x72, 0x00, 0x65, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x64, 0x00, 0x20, 0x00,
+    0x75, 0x00, 0x73, 0x00, 0x69, 0x00, 0x6E, 0x00, 0x67, 0x00, 0x20, 0x00, 0x6D, 0x00, 0x75, 0x00,
+    0x6C, 0x00, 0x74, 0x00, 0x69, 0x00, 0x74, 0x00, 0x68, 0x00, 0x72, 0x00, 0x65, 0x00, 0x61, 0x00,
+    0x64, 0x00, 0x65, 0x00, 0x64, 0x00, 0x20, 0x00, 0x58, 0x00, 0x50, 0x00, 0x72, 0x00, 0x73, 0x00,
+    0x39, 0x00, 0x2E, 0x00
+}; // "This backup was created using multithreaded XPrs9."
+
+static const std::vector<uint8_t> STREAM_STORAGE_SIGNATURE_BYTES = {
+    0xFF, 0xFE, // UTF-16LE BOM
+    0x53, 0x00, 0x54, 0x00, 0x52, 0x00, 0x45, 0x00, 0x41, 0x00, 0x4D, 0x00, 0x5F, 0x00, 0x53, 0x00,
+    0x54, 0x00, 0x4F, 0x00, 0x52, 0x00, 0x41, 0x00, 0x47, 0x00, 0x45, 0x00, 0x5F, 0x00, 0x53, 0x00,
+    0x49, 0x00, 0x47, 0x00, 0x4E, 0x00, 0x41, 0x00, 0x54, 0x00, 0x55, 0x00, 0x52, 0x00, 0x45, 0x00,
+    0x5F, 0x00, 0x29, 0x00, 0x21, 0x00, 0x40, 0x00, 0x23, 0x00, 0x24, 0x00, 0x25, 0x00, 0x5E, 0x00,
+    0x26, 0x00, 0x2A, 0x00, 0x28, 0x00
+}; // "STREAM_STORAGE_SIGNATURE_)!@#$%^&*("
+
+enum class DataModelType {
+    SINGLE_THREADED,
+    MULTI_THREADED,
+    UNCOMPRESSED,
+    UNKNOWN
+};
+
+static DataModelType DetectDataModelType(duckdb::FileHandle &file_handle, uint64_t datamodel_ofs) {
+    // Read signature bytes
+    std::vector<uint8_t> signature(ABF_XPRESS9_SIGNATURE);
+    file_handle.Seek(datamodel_ofs);
+    file_handle.Read(reinterpret_cast<char *>(signature.data()), ABF_XPRESS9_SIGNATURE);
+    
+    // Check for compressed file types (single-threaded or multi-threaded)
+    if (std::equal(SINGLE_THREAD_SIGNATURE_BYTES.begin(), SINGLE_THREAD_SIGNATURE_BYTES.end(), signature.begin())) {
+        return DataModelType::SINGLE_THREADED;
+    }
+    
+    if (std::equal(MULTI_THREAD_SIGNATURE_BYTES.begin(), MULTI_THREAD_SIGNATURE_BYTES.end(), signature.begin())) {
+        return DataModelType::MULTI_THREADED;
+    }
+    
+    // Check for uncompressed ABF backup (look for STREAM_STORAGE_SIGNATURE in first 72 bytes)
+    file_handle.Seek(datamodel_ofs);
+    std::vector<uint8_t> header(ABF_BACKUP_LOG_HEADER_OFFSET);
+    file_handle.Read(reinterpret_cast<char *>(header.data()), ABF_BACKUP_LOG_HEADER_OFFSET);
+    
+    auto it = std::search(header.begin(), header.end(), 
+                         STREAM_STORAGE_SIGNATURE_BYTES.begin(), 
+                         STREAM_STORAGE_SIGNATURE_BYTES.end());
+    if (it != header.end()) {
+        return DataModelType::UNCOMPRESSED;
+    }
+    
+    return DataModelType::UNKNOWN;
+}
 
 std::vector<uint8_t> AbfParser::read_buffer_bytes(const std::vector<uint8_t> &buffer, uint64_t offset, int size)
 {
@@ -29,11 +95,9 @@ std::vector<uint8_t> AbfParser::trim_buffer(const std::vector<uint8_t> &buffer)
 
 BackupLogHeader AbfParser::process_backup_log_header(const std::vector<uint8_t> &buffer)
 {
-
     std::vector<uint8_t> backup_log_header_buffer = read_buffer_bytes(buffer, ABF_BACKUP_LOG_HEADER_OFFSET, ABF_BACKUP_LOG_HEADER_SIZE);
     backup_log_header_buffer = trim_buffer(backup_log_header_buffer);
     return BackupLogHeader::from_xml(backup_log_header_buffer, "UTF-16");
-
 }
 
 DataModel AbfParser::extract_sqlite_buffer(const std::vector<uint8_t> &buffer, uint64_t skip_offset, BackupLogHeader virtual_dir)
@@ -64,7 +128,7 @@ DataModel AbfParser::extract_sqlite_buffer(const std::vector<uint8_t> &buffer, u
     uint64_t sqlite_offset = sqlite.m_cbOffsetHeader;
     int sqlite_size = sqlite.Size;
 
-    DataModel data_model= {
+    DataModel data_model = {
         read_buffer_bytes(buffer, sqlite_offset - skip_offset, sqlite_size),
         match_logs_and_get_vertipaq_meta(backup_log, virtual_directory),
         virtual_dir.ErrorCode
@@ -73,10 +137,8 @@ DataModel AbfParser::extract_sqlite_buffer(const std::vector<uint8_t> &buffer, u
     return data_model;
 }
 
-
 std::vector<VertipaqFile> AbfParser::match_logs_and_get_vertipaq_meta(const BackupLog& backupLog, const VirtualDirectory& virtualDirectory)
 {
-
     std::vector<VertipaqFile> matchedData;
     // Check if fileGroups and backupFiles are populated
     if (!backupLog.fileGroups.has_value() || !virtualDirectory.backupFiles.has_value()) {
@@ -117,7 +179,6 @@ std::vector<VertipaqFile> AbfParser::match_logs_and_get_vertipaq_meta(const Back
     }
 
     return matchedData;
-
 }
 
 void AbfParser::patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t &block_index_iterator)
@@ -171,14 +232,12 @@ std::vector<uint8_t> AbfParser::decompress_initial_block(duckdb::FileHandle &fil
     {
         throw std::runtime_error("Mismatch in decompressed block size in first block.");
     }
-    // file_handle = file_handle_p.release();
     return decompressed_buffer;
 }
 
 std::vector<uint8_t> AbfParser::iterate_and_decompress_blocks(duckdb::FileHandle &file_handle_p, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, BackupLogHeader virtual_directory, const int trailing_blocks, uint64_t &skip_offset)
 {
     // Calculate the total number of blocks
-
     auto total_blocks = (virtual_directory.DataSize + virtual_directory.m_cbOffsetHeader) / BLOCK_SIZE;
 
     std::vector<uint8_t> all_decompressed_data;
@@ -229,12 +288,187 @@ std::vector<uint8_t> AbfParser::iterate_and_decompress_blocks(duckdb::FileHandle
         all_decompressed_data.insert(all_decompressed_data.end(), decompressed_buffer.begin(), decompressed_buffer.end());
     }
 
-    // file_handle = file_handle_p.release();
+    return all_decompressed_data;
+}
+
+std::vector<uint8_t> AbfParser::decompress_initial_block_multithread(duckdb::FileHandle &file_handle_p, uint64_t &bytes_read, XPress9Wrapper &xpress9_wrapper, MultiThreadMetadata &metadata)
+{
+    // Seek to the start of the DataModel compressed data (skip signature)
+    std::vector<uint8_t> signature(ABF_XPRESS9_SIGNATURE);
+    file_handle_p.Read(reinterpret_cast<char *>(signature.data()), ABF_XPRESS9_SIGNATURE);
+    bytes_read += ABF_XPRESS9_SIGNATURE;
+
+    // Read multi-threaded metadata
+    file_handle_p.Read(reinterpret_cast<char *>(&metadata.main_chunks_per_thread), sizeof(uint64_t));
+    file_handle_p.Read(reinterpret_cast<char *>(&metadata.prefix_chunks_per_thread), sizeof(uint64_t));
+    file_handle_p.Read(reinterpret_cast<char *>(&metadata.prefix_thread_count), sizeof(uint64_t));
+    file_handle_p.Read(reinterpret_cast<char *>(&metadata.main_thread_count), sizeof(uint64_t));
+    file_handle_p.Read(reinterpret_cast<char *>(&metadata.chunk_uncompressed_size), sizeof(uint64_t));
+    bytes_read += ABF_MULTITHREAD_METADATA_SIZE;
+
+    // Decompress the first chunk to get backup log header
+    uint32_t uncompressed_size;
+    uint32_t compressed_size;
+    file_handle_p.Read(reinterpret_cast<char *>(&uncompressed_size), sizeof(uint32_t));
+    file_handle_p.Read(reinterpret_cast<char *>(&compressed_size), sizeof(uint32_t));
+    bytes_read += sizeof(uint32_t) + sizeof(uint32_t);
+
+    // Allocate buffers for compressed and decompressed data
+    std::vector<uint8_t> decompressed_buffer(uncompressed_size);
+    std::vector<uint8_t> compressed_buffer(compressed_size);
+
+    file_handle_p.Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
+    bytes_read += compressed_size;
+
+    // Decompress the first chunk
+    uint32_t decompressed_size = xpress9_wrapper.Decompress(compressed_buffer.data(), compressed_size, decompressed_buffer.data(), decompressed_buffer.size());
+    if (decompressed_size != uncompressed_size)
+    {
+        throw std::runtime_error("Mismatch in decompressed block size in first chunk.");
+    }
+
+    return decompressed_buffer;
+}
+
+std::vector<uint8_t> AbfParser::iterate_and_decompress_chunks_multithread(duckdb::FileHandle &file_handle_p, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, const MultiThreadMetadata &metadata, BackupLogHeader virtual_directory, const int trailing_chunks, uint64_t &skip_offset)
+{
+    // Calculate total number of chunks across all threads
+    uint64_t total_prefix_chunks = metadata.prefix_thread_count * metadata.prefix_chunks_per_thread;
+    uint64_t total_main_chunks = metadata.main_thread_count * metadata.main_chunks_per_thread;
+    uint64_t total_chunks = total_prefix_chunks + total_main_chunks;
+
+    // Calculate which groups to process based on trailing_chunks
+    // Work backwards from the end to determine how many groups we need
+    uint64_t remaining_chunks_needed = static_cast<uint64_t>(trailing_chunks);
+    uint64_t main_groups_to_process = 0;
+    uint64_t prefix_groups_to_process = 0;
+
+    // Start from the end (main groups come last)
+    if (metadata.main_thread_count > 0 && metadata.main_chunks_per_thread > 0) {
+        if (remaining_chunks_needed >= total_main_chunks) {
+            // Need all main groups
+            main_groups_to_process = metadata.main_thread_count;
+            remaining_chunks_needed -= total_main_chunks;
+        } else {
+            // Need only some main groups (round up to get complete groups)
+            main_groups_to_process = (remaining_chunks_needed + metadata.main_chunks_per_thread - 1) / metadata.main_chunks_per_thread;
+            remaining_chunks_needed = 0;
+        }
+    }
+
+    // If we still need more chunks, get from prefix groups
+    if (remaining_chunks_needed > 0 && metadata.prefix_thread_count > 0 && metadata.prefix_chunks_per_thread > 0) {
+        if (remaining_chunks_needed >= total_prefix_chunks) {
+            // Need all prefix groups
+            prefix_groups_to_process = metadata.prefix_thread_count;
+        } else {
+            // Need only some prefix groups (round up to get complete groups)
+            prefix_groups_to_process = (remaining_chunks_needed + metadata.prefix_chunks_per_thread - 1) / metadata.prefix_chunks_per_thread;
+        }
+    }
+
+    // Calculate how many groups to skip from the beginning
+    uint64_t prefix_groups_to_skip = metadata.prefix_thread_count - prefix_groups_to_process;
+    uint64_t main_groups_to_skip = metadata.main_thread_count - main_groups_to_process;
+
+    std::vector<uint8_t> all_decompressed_data;
+    uint64_t current_chunk = 0;
+    uint32_t block_index_iterator = 0;
+
+    // Track which group and position within that group we're in
+    uint64_t current_prefix_group = 0;
+    uint64_t current_main_group = 0;
+
+    // Process prefix chunks
+    for (uint64_t i = 0; i < total_prefix_chunks && bytes_read < datamodel_size; ++i) {
+        current_chunk++;
+        current_prefix_group = i / metadata.prefix_chunks_per_thread;
+
+        // Read the compressed and uncompressed sizes
+        uint32_t uncompressed_size = 0;
+        uint32_t compressed_size = 0;
+        file_handle_p.Read(reinterpret_cast<char *>(&uncompressed_size), sizeof(uncompressed_size));
+        file_handle_p.Read(reinterpret_cast<char *>(&compressed_size), sizeof(compressed_size));
+        bytes_read += sizeof(uncompressed_size) + sizeof(compressed_size);
+
+        // Skip this chunk if its group is in the skip range
+        if (current_prefix_group < prefix_groups_to_skip) {
+            skip_offset += uncompressed_size;
+            bytes_read += compressed_size;
+            file_handle_p.Seek(datamodel_ofs + bytes_read);
+            continue;
+        }
+
+        // Allocate buffers for the compressed and decompressed data
+        std::vector<uint8_t> compressed_buffer(compressed_size);
+        std::vector<uint8_t> decompressed_buffer(uncompressed_size);
+
+        // Read the compressed chunk
+        file_handle_p.Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
+        bytes_read += compressed_size;
+
+        // Patch header for this chunk
+        patch_header_of_compressed_buffer(compressed_buffer, block_index_iterator);
+
+        // Decompress the chunk
+        uint32_t decompressed_size = xpress9_wrapper.Decompress(compressed_buffer.data(), compressed_size, decompressed_buffer.data(), decompressed_buffer.size());
+
+        // Verify decompression success
+        if (decompressed_size != uncompressed_size) {
+            throw std::runtime_error("Decompression failed or resulted in unexpected size for prefix chunk.");
+        }
+
+        // Add decompressed data to the overall buffer
+        all_decompressed_data.insert(all_decompressed_data.end(), decompressed_buffer.begin(), decompressed_buffer.end());
+    }
+
+    // Process main chunks
+    for (uint64_t i = 0; i < total_main_chunks && bytes_read < datamodel_size; ++i) {
+        current_chunk++;
+        current_main_group = i / metadata.main_chunks_per_thread;
+
+        // Read the compressed and uncompressed sizes
+        uint32_t uncompressed_size = 0;
+        uint32_t compressed_size = 0;
+        file_handle_p.Read(reinterpret_cast<char *>(&uncompressed_size), sizeof(uncompressed_size));
+        file_handle_p.Read(reinterpret_cast<char *>(&compressed_size), sizeof(compressed_size));
+        bytes_read += sizeof(uncompressed_size) + sizeof(compressed_size);
+
+        // Skip this chunk if its group is in the skip range
+        if (current_main_group < main_groups_to_skip) {
+            skip_offset += uncompressed_size;
+            bytes_read += compressed_size;
+            file_handle_p.Seek(datamodel_ofs + bytes_read);
+            continue;
+        }
+
+        // Allocate buffers for the compressed and decompressed data
+        std::vector<uint8_t> compressed_buffer(compressed_size);
+        std::vector<uint8_t> decompressed_buffer(uncompressed_size);
+
+        // Read the compressed chunk
+        file_handle_p.Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
+        bytes_read += compressed_size;
+
+        // Patch header for this chunk
+        patch_header_of_compressed_buffer(compressed_buffer, block_index_iterator);
+
+        // Decompress the chunk
+        uint32_t decompressed_size = xpress9_wrapper.Decompress(compressed_buffer.data(), compressed_size, decompressed_buffer.data(), decompressed_buffer.size());
+
+        // Verify decompression success
+        if (decompressed_size != uncompressed_size) {
+            throw std::runtime_error("Decompression failed or resulted in unexpected size for main chunk.");
+        }
+
+        // Add decompressed data to the overall buffer
+        all_decompressed_data.insert(all_decompressed_data.end(), decompressed_buffer.begin(), decompressed_buffer.end());
+    }
 
     return all_decompressed_data;
 }
 
-DataModel  AbfParser::get_sqlite(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks = 15)
+DataModel AbfParser::get_sqlite(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks)
 {
     auto &fs = duckdb::FileSystem::GetFileSystem(context);
     // Open the file using FileSystem
@@ -255,9 +489,7 @@ DataModel  AbfParser::get_sqlite(duckdb::ClientContext &context, const std::stri
     // Now, try to find a specific file in the ZIP, for example "DataModel"
     auto [datamodel_ofs, datamodel_size] = ZipUtils::findDataModel(*file_handle);
 
-
     uint64_t bytes_read = 0;
-    uint16_t zip_pointer = 0;
 
     // Read compressed DataModel header to adjust offset
     file_handle->Seek(datamodel_ofs + ZIP_LOCAL_FILE_HEADER_FIXED);
@@ -267,9 +499,22 @@ DataModel  AbfParser::get_sqlite(duckdb::ClientContext &context, const std::stri
     file_handle->Read(reinterpret_cast<char *>(&extra_len), sizeof(extra_len));
     datamodel_ofs += ZIP_LOCAL_FILE_HEADER + filename_len + extra_len;
 
+    // Detect the DataModel file type
+    DataModelType file_type = DetectDataModelType(*file_handle, datamodel_ofs);
 
-    // auto datamodel_ofs = 0;
-    // auto datamodel_size = file_handle->GetFileSize();
+    // Throw exceptions for unsupported types
+    if (file_type == DataModelType::UNCOMPRESSED)
+    {
+        throw std::runtime_error("Uncompressed ABF backup files are not yet supported. "
+                                "Please use a compressed PBIX file (single-threaded or multi-threaded XPress9 compression).");
+    }
+    
+    if (file_type == DataModelType::UNKNOWN)
+    {
+        throw std::runtime_error("Unknown or unsupported DataModel file format. "
+                                "Expected one of: single-threaded XPress9, multi-threaded XPress9, or uncompressed ABF backup. "
+                                "This file does not match any known signature.");
+    }
 
     file_handle->Seek(datamodel_ofs);
     XPress9Wrapper xpress9_wrapper;
@@ -278,23 +523,43 @@ DataModel  AbfParser::get_sqlite(duckdb::ClientContext &context, const std::stri
         throw std::runtime_error("Failed to initialize XPress9Wrapper");
     }
 
-    // Decompress initial block to get the virtual directory info
-    auto initial_decompressed_buffer = decompress_initial_block(*file_handle, bytes_read, xpress9_wrapper);
+    std::vector<uint8_t> initial_decompressed_buffer;
+    BackupLogHeader backup_log_header;
+    uint64_t skip_offset = 0;
+    std::vector<uint8_t> all_decompressed_buffer;
 
-    // Process backup log header to get virtual directory offset and size
-    auto backup_log_header = process_backup_log_header(initial_decompressed_buffer);
+    if (file_type == DataModelType::SINGLE_THREADED)
+    {
+        // Decompress initial block to get the virtual directory info
+        initial_decompressed_buffer = decompress_initial_block(*file_handle, bytes_read, xpress9_wrapper);
 
-    uint64_t skip_offset = 0; // optimization for skipping blocks
-    // Iterate through the remaining blocks and decompress them
-    auto all_decompressed_buffer = iterate_and_decompress_blocks(*file_handle, bytes_read, datamodel_ofs, datamodel_size, xpress9_wrapper, backup_log_header, trailing_blocks, skip_offset);
+        // Process backup log header to get virtual directory offset and size
+        backup_log_header = process_backup_log_header(initial_decompressed_buffer);
 
-    // Prefix all_decompressed_buffer with initial_decompressed_buffer in case we have only one block
+        // Iterate through the remaining blocks and decompress them
+        all_decompressed_buffer = iterate_and_decompress_blocks(*file_handle, bytes_read, datamodel_ofs, datamodel_size, xpress9_wrapper, backup_log_header, trailing_blocks, skip_offset);
+    }
+    else if (file_type == DataModelType::MULTI_THREADED)
+    {
+        // For multi-threaded files, read metadata first
+        MultiThreadMetadata metadata;
+        initial_decompressed_buffer = decompress_initial_block_multithread(*file_handle, bytes_read, xpress9_wrapper, metadata);
+
+        // Process backup log header to get virtual directory offset and size
+        backup_log_header = process_backup_log_header(initial_decompressed_buffer);
+
+        // Iterate through the remaining chunks and decompress them
+        all_decompressed_buffer = iterate_and_decompress_chunks_multithread(*file_handle, bytes_read, datamodel_ofs, datamodel_size, xpress9_wrapper, metadata, backup_log_header, trailing_blocks, skip_offset);
+    }
+
+    // Prefix all_decompressed_buffer with initial_decompressed_buffer in case we have only one block/chunk
     all_decompressed_buffer.insert(all_decompressed_buffer.begin(), initial_decompressed_buffer.begin(), initial_decompressed_buffer.end());
 
     if (skip_offset + all_decompressed_buffer.size() < backup_log_header.m_cbOffsetHeader + backup_log_header.DataSize)
     {
         throw std::runtime_error("Could not parse the entire DataModel.");
     }
+
     // Finally, extract the SQLite buffer from the decompressed data
     return extract_sqlite_buffer(all_decompressed_buffer, skip_offset, backup_log_header);
 }
