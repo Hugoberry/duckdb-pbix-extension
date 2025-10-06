@@ -1,0 +1,18 @@
+# name: test/sql/pbix2vpax_MT.test
+# description: test pbix2vpax function on large DataModels
+# group: [pbix]
+
+require pbix
+
+# Test basic function call
+query I
+SELECT COUNT(*) > 0 FROM (SELECT unnest(pbix2vpax('data/Power/meta2.pbix').Tables));
+----
+true
+
+# Test that Tables array is populated
+query I
+SELECT list_count(pbix2vpax('data/work.pbix').Tables) >0;
+----
+true
+
