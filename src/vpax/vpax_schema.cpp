@@ -168,6 +168,15 @@ LogicalType VpaxSchema::CreatePartitionType() {
     return LogicalType::STRUCT(partition_children);
 }
 
+LogicalType VpaxSchema::CreateTablePermissionType() {
+    child_list_t<LogicalType> permission_children;
+    permission_children.push_back(make_pair("RoleName", LogicalType::VARCHAR));
+    permission_children.push_back(make_pair("TableName", LogicalType::VARCHAR));
+    permission_children.push_back(make_pair("FilterExpression", LogicalType::VARCHAR));
+    
+    return LogicalType::STRUCT(permission_children);
+}
+
 LogicalType VpaxSchema::CreateErrorType() {
     child_list_t<LogicalType> error_children;
     error_children.push_back(make_pair("error", LogicalType::VARCHAR));
@@ -190,7 +199,7 @@ LogicalType VpaxSchema::CreateVpaxType() {
     vpax_children.push_back(make_pair("UserHierarchies", LogicalType::LIST(CreateUserHierarchyType())));
     vpax_children.push_back(make_pair("Relationships", LogicalType::LIST(CreateRelationshipType())));
     vpax_children.push_back(make_pair("Partitions", LogicalType::LIST(CreatePartitionType())));
-    vpax_children.push_back(make_pair("TablePermissions", LogicalType::LIST(LogicalType::VARCHAR))); // Empty arrays
+    vpax_children.push_back(make_pair("TablePermissions", LogicalType::LIST(CreateTablePermissionType())));
     vpax_children.push_back(make_pair("CalculationItems", LogicalType::LIST(LogicalType::VARCHAR))); // Empty arrays
     
     return LogicalType::STRUCT(vpax_children);

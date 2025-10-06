@@ -269,6 +269,19 @@ Value VpaxValueFactory::CreatePartitionValue(
     return Value::STRUCT(partition_values);
 }
 
+Value VpaxValueFactory::CreateTablePermissionValue(
+    const std::string &role_name,
+    const std::string &table_name,
+    const std::string &filter_expression) {
+    
+    child_list_t<Value> permission_values;
+    permission_values.push_back(make_pair("RoleName", Value(role_name)));
+    permission_values.push_back(make_pair("TableName", Value(table_name)));
+    permission_values.push_back(make_pair("FilterExpression", Value(filter_expression)));
+    
+    return Value::STRUCT(permission_values);
+}
+
 Value VpaxValueFactory::CreateErrorValue(
     const std::string &message,
     const std::string &file_name,

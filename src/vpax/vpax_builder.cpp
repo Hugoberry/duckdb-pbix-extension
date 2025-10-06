@@ -238,6 +238,7 @@ Value VpaxBuilder::BuildVpax() {
     auto column_hierarchies = BuildColumnHierarchies();
     auto user_hierarchies = BuildUserHierarchies(prefetched);
     auto partitions = BuildPartitions();
+    auto table_permissions = BuildTablePermissions();
     
     // Create the main VPAX structure
     child_list_t<Value> vpax_values;
@@ -249,7 +250,7 @@ Value VpaxBuilder::BuildVpax() {
     vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), vector<Value>(user_hierarchies.begin(), user_hierarchies.end()))));
     vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), vector<Value>(relationships.begin(), relationships.end()))));
     vpax_values.push_back(make_pair("Partitions", Value::LIST(VpaxSchema::CreatePartitionType(), vector<Value>(partitions.begin(), partitions.end()))));
-    vpax_values.push_back(make_pair("TablePermissions", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
+    vpax_values.push_back(make_pair("TablePermissions", Value::LIST(VpaxSchema::CreateTablePermissionType(), vector<Value>(table_permissions.begin(), table_permissions.end()))));
     vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
     
     return Value::STRUCT(vpax_values);
@@ -727,7 +728,32 @@ std::vector<Value> VpaxBuilder::BuildColumnSegments() {
 }
 
 std::vector<Value> VpaxBuilder::BuildTablePermissions() {
-    return std::vector<Value>(); // Empty for now
+    std::vector<Value> permissions;
+    
+    std::string sql = R"(
+        SELECT 
+            t.Name as TableName,
+            r.Name as RoleName,
+            tp.FilterExpression
+        FROM TablePermission tp
+        JOIN [Table] t on t.ID = tp.TableID
+        JOIN Role r on r.ID = tp.RoleID
+    )";
+    
+    SQLiteStatement stmt = db_.Prepare(sql);
+    while (stmt.Step()) {
+        std::string table_name = stmt.GetValue<std::string>(0);
+        std::string role_name = stmt.GetValue<std::string>(1);
+        std::string filter_expression = stmt.GetValue<std::string>(2);
+        
+        permissions.push_back(VpaxValueFactory::CreateTablePermissionValue(
+            role_name,
+            table_name,
+            filter_expression
+        ));
+    }
+    
+    return permissions;
 }
 
 std::vector<Value> VpaxBuilder::BuildCalculationItems() {
