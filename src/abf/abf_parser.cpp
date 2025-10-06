@@ -191,6 +191,18 @@ void AbfParser::patch_header_of_compressed_buffer(std::vector<uint8_t> &compress
     header.insert_into_buffer(compressed_buffer, 0);
 }
 
+// Multi-threaded version that patches session signature
+void AbfParser::patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t &block_index_iterator, uint32_t session_signature)
+{
+    block_index_iterator++;
+
+    Header header = Header::extract_from_buffer(compressed_buffer, 0);
+    header.block_index = block_index_iterator;
+    header.session_signature = session_signature;
+    header.update_crc();
+    header.insert_into_buffer(compressed_buffer, 0);
+}
+
 void AbfParser::read_compressed_datamodel_header(std::ifstream &entryStream, uint64_t &datamodel_ofs)
 {
     // Read compressed DataModel header to adjust offset
@@ -291,7 +303,7 @@ std::vector<uint8_t> AbfParser::iterate_and_decompress_blocks(duckdb::FileHandle
     return all_decompressed_data;
 }
 
-std::vector<uint8_t> AbfParser::decompress_initial_block_multithread(duckdb::FileHandle &file_handle_p, uint64_t &bytes_read, XPress9Wrapper &xpress9_wrapper, MultiThreadMetadata &metadata)
+std::vector<uint8_t> AbfParser::decompress_initial_block_multithread(duckdb::FileHandle &file_handle_p, uint64_t &bytes_read, XPress9Wrapper &xpress9_wrapper, MultiThreadMetadata &metadata, uint32_t &first_session_signature)
 {
     // Seek to the start of the DataModel compressed data (skip signature)
     std::vector<uint8_t> signature(ABF_XPRESS9_SIGNATURE);
@@ -299,10 +311,10 @@ std::vector<uint8_t> AbfParser::decompress_initial_block_multithread(duckdb::Fil
     bytes_read += ABF_XPRESS9_SIGNATURE;
 
     // Read multi-threaded metadata
-    file_handle_p.Read(reinterpret_cast<char *>(&metadata.main_chunks_per_thread), sizeof(uint64_t));
-    file_handle_p.Read(reinterpret_cast<char *>(&metadata.prefix_chunks_per_thread), sizeof(uint64_t));
-    file_handle_p.Read(reinterpret_cast<char *>(&metadata.prefix_thread_count), sizeof(uint64_t));
-    file_handle_p.Read(reinterpret_cast<char *>(&metadata.main_thread_count), sizeof(uint64_t));
+    file_handle_p.Read(reinterpret_cast<char *>(&metadata.tail_block_count), sizeof(uint64_t));
+    file_handle_p.Read(reinterpret_cast<char *>(&metadata.head_block_count), sizeof(uint64_t));
+    file_handle_p.Read(reinterpret_cast<char *>(&metadata.head_thread_count), sizeof(uint64_t));
+    file_handle_p.Read(reinterpret_cast<char *>(&metadata.tail_thread_count), sizeof(uint64_t));
     file_handle_p.Read(reinterpret_cast<char *>(&metadata.chunk_uncompressed_size), sizeof(uint64_t));
     bytes_read += ABF_MULTITHREAD_METADATA_SIZE;
 
@@ -320,6 +332,10 @@ std::vector<uint8_t> AbfParser::decompress_initial_block_multithread(duckdb::Fil
     file_handle_p.Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
     bytes_read += compressed_size;
 
+    // Extract session signature from first chunk before decompressing
+    Header first_header = Header::extract_from_buffer(compressed_buffer, 0);
+    first_session_signature = first_header.session_signature;
+
     // Decompress the first chunk
     uint32_t decompressed_size = xpress9_wrapper.Decompress(compressed_buffer.data(), compressed_size, decompressed_buffer.data(), decompressed_buffer.size());
     if (decompressed_size != uncompressed_size)
@@ -330,60 +346,21 @@ std::vector<uint8_t> AbfParser::decompress_initial_block_multithread(duckdb::Fil
     return decompressed_buffer;
 }
 
-std::vector<uint8_t> AbfParser::iterate_and_decompress_chunks_multithread(duckdb::FileHandle &file_handle_p, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, const MultiThreadMetadata &metadata, BackupLogHeader virtual_directory, const int trailing_chunks, uint64_t &skip_offset)
+std::vector<uint8_t> AbfParser::iterate_and_decompress_chunks_multithread(duckdb::FileHandle &file_handle_p, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, const MultiThreadMetadata &metadata, BackupLogHeader virtual_directory, const int trailing_chunks, uint64_t &skip_offset, uint32_t first_session_signature)
 {
     // Calculate total number of chunks across all threads
-    uint64_t total_prefix_chunks = metadata.prefix_thread_count * metadata.prefix_chunks_per_thread;
-    uint64_t total_main_chunks = metadata.main_thread_count * metadata.main_chunks_per_thread;
-    uint64_t total_chunks = total_prefix_chunks + total_main_chunks;
-
-    // Calculate which groups to process based on trailing_chunks
-    // Work backwards from the end to determine how many groups we need
-    uint64_t remaining_chunks_needed = static_cast<uint64_t>(trailing_chunks);
-    uint64_t main_groups_to_process = 0;
-    uint64_t prefix_groups_to_process = 0;
-
-    // Start from the end (main groups come last)
-    if (metadata.main_thread_count > 0 && metadata.main_chunks_per_thread > 0) {
-        if (remaining_chunks_needed >= total_main_chunks) {
-            // Need all main groups
-            main_groups_to_process = metadata.main_thread_count;
-            remaining_chunks_needed -= total_main_chunks;
-        } else {
-            // Need only some main groups (round up to get complete groups)
-            main_groups_to_process = (remaining_chunks_needed + metadata.main_chunks_per_thread - 1) / metadata.main_chunks_per_thread;
-            remaining_chunks_needed = 0;
-        }
-    }
-
-    // If we still need more chunks, get from prefix groups
-    if (remaining_chunks_needed > 0 && metadata.prefix_thread_count > 0 && metadata.prefix_chunks_per_thread > 0) {
-        if (remaining_chunks_needed >= total_prefix_chunks) {
-            // Need all prefix groups
-            prefix_groups_to_process = metadata.prefix_thread_count;
-        } else {
-            // Need only some prefix groups (round up to get complete groups)
-            prefix_groups_to_process = (remaining_chunks_needed + metadata.prefix_chunks_per_thread - 1) / metadata.prefix_chunks_per_thread;
-        }
-    }
-
-    // Calculate how many groups to skip from the beginning
-    uint64_t prefix_groups_to_skip = metadata.prefix_thread_count - prefix_groups_to_process;
-    uint64_t main_groups_to_skip = metadata.main_thread_count - main_groups_to_process;
+    uint64_t total_head_chunks = metadata.head_thread_count * metadata.head_block_count;
+    uint64_t total_tail_chunks = metadata.tail_thread_count * metadata.tail_block_count;
+    uint64_t total_chunks = total_head_chunks + total_tail_chunks;
 
     std::vector<uint8_t> all_decompressed_data;
-    uint64_t current_chunk = 0;
+    uint64_t chunk_index = 0;
     uint32_t block_index_iterator = 0;
 
-    // Track which group and position within that group we're in
-    uint64_t current_prefix_group = 0;
-    uint64_t current_main_group = 0;
-
-    // Process prefix chunks
-    for (uint64_t i = 0; i < total_prefix_chunks && bytes_read < datamodel_size; ++i) {
-        current_chunk++;
-        current_prefix_group = i / metadata.prefix_chunks_per_thread;
-
+    // Process head/prefix chunks
+    for (uint64_t i = 0; i < total_head_chunks && bytes_read < datamodel_size; ++i) {
+        chunk_index++;
+        
         // Read the compressed and uncompressed sizes
         uint32_t uncompressed_size = 0;
         uint32_t compressed_size = 0;
@@ -391,8 +368,8 @@ std::vector<uint8_t> AbfParser::iterate_and_decompress_chunks_multithread(duckdb
         file_handle_p.Read(reinterpret_cast<char *>(&compressed_size), sizeof(compressed_size));
         bytes_read += sizeof(uncompressed_size) + sizeof(compressed_size);
 
-        // Skip this chunk if its group is in the skip range
-        if (current_prefix_group < prefix_groups_to_skip) {
+        // Skip chunks if not within the last `trailing_chunks`
+        if (total_chunks > static_cast<uint64_t>(trailing_chunks) && chunk_index < (total_chunks - trailing_chunks)) {
             skip_offset += uncompressed_size;
             bytes_read += compressed_size;
             file_handle_p.Seek(datamodel_ofs + bytes_read);
@@ -407,26 +384,25 @@ std::vector<uint8_t> AbfParser::iterate_and_decompress_chunks_multithread(duckdb
         file_handle_p.Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
         bytes_read += compressed_size;
 
-        // Patch header for this chunk
-        patch_header_of_compressed_buffer(compressed_buffer, block_index_iterator);
+        // Patch header: update block_index and session_signature to match first chunk
+        patch_header_of_compressed_buffer(compressed_buffer, block_index_iterator, first_session_signature);
 
         // Decompress the chunk
         uint32_t decompressed_size = xpress9_wrapper.Decompress(compressed_buffer.data(), compressed_size, decompressed_buffer.data(), decompressed_buffer.size());
 
         // Verify decompression success
         if (decompressed_size != uncompressed_size) {
-            throw std::runtime_error("Decompression failed or resulted in unexpected size for prefix chunk.");
+            throw std::runtime_error("Decompression failed or resulted in unexpected size for head chunk.");
         }
 
         // Add decompressed data to the overall buffer
         all_decompressed_data.insert(all_decompressed_data.end(), decompressed_buffer.begin(), decompressed_buffer.end());
     }
 
-    // Process main chunks
-    for (uint64_t i = 0; i < total_main_chunks && bytes_read < datamodel_size; ++i) {
-        current_chunk++;
-        current_main_group = i / metadata.main_chunks_per_thread;
-
+    // Process tail/main chunks
+    for (uint64_t i = 0; i < total_tail_chunks && bytes_read < datamodel_size; ++i) {
+        chunk_index++;
+        
         // Read the compressed and uncompressed sizes
         uint32_t uncompressed_size = 0;
         uint32_t compressed_size = 0;
@@ -434,8 +410,8 @@ std::vector<uint8_t> AbfParser::iterate_and_decompress_chunks_multithread(duckdb
         file_handle_p.Read(reinterpret_cast<char *>(&compressed_size), sizeof(compressed_size));
         bytes_read += sizeof(uncompressed_size) + sizeof(compressed_size);
 
-        // Skip this chunk if its group is in the skip range
-        if (current_main_group < main_groups_to_skip) {
+        // Skip chunks if not within the last `trailing_chunks`
+        if (total_chunks > static_cast<uint64_t>(trailing_chunks) && chunk_index < (total_chunks - trailing_chunks)) {
             skip_offset += uncompressed_size;
             bytes_read += compressed_size;
             file_handle_p.Seek(datamodel_ofs + bytes_read);
@@ -450,15 +426,15 @@ std::vector<uint8_t> AbfParser::iterate_and_decompress_chunks_multithread(duckdb
         file_handle_p.Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
         bytes_read += compressed_size;
 
-        // Patch header for this chunk
-        patch_header_of_compressed_buffer(compressed_buffer, block_index_iterator);
+        // Patch header: update block_index and session_signature to match first chunk
+        patch_header_of_compressed_buffer(compressed_buffer, block_index_iterator, first_session_signature);
 
         // Decompress the chunk
         uint32_t decompressed_size = xpress9_wrapper.Decompress(compressed_buffer.data(), compressed_size, decompressed_buffer.data(), decompressed_buffer.size());
 
         // Verify decompression success
         if (decompressed_size != uncompressed_size) {
-            throw std::runtime_error("Decompression failed or resulted in unexpected size for main chunk.");
+            throw std::runtime_error("Decompression failed or resulted in unexpected size for tail chunk.");
         }
 
         // Add decompressed data to the overall buffer
@@ -543,13 +519,14 @@ DataModel AbfParser::get_sqlite(duckdb::ClientContext &context, const std::strin
     {
         // For multi-threaded files, read metadata first
         MultiThreadMetadata metadata;
-        initial_decompressed_buffer = decompress_initial_block_multithread(*file_handle, bytes_read, xpress9_wrapper, metadata);
+        uint32_t first_session_signature = 0;
+        initial_decompressed_buffer = decompress_initial_block_multithread(*file_handle, bytes_read, xpress9_wrapper, metadata, first_session_signature);
 
         // Process backup log header to get virtual directory offset and size
         backup_log_header = process_backup_log_header(initial_decompressed_buffer);
 
         // Iterate through the remaining chunks and decompress them
-        all_decompressed_buffer = iterate_and_decompress_chunks_multithread(*file_handle, bytes_read, datamodel_ofs, datamodel_size, xpress9_wrapper, metadata, backup_log_header, trailing_blocks, skip_offset);
+        all_decompressed_buffer = iterate_and_decompress_chunks_multithread(*file_handle, bytes_read, datamodel_ofs, datamodel_size, xpress9_wrapper, metadata, backup_log_header, trailing_blocks, skip_offset, first_session_signature);
     }
 
     // Prefix all_decompressed_buffer with initial_decompressed_buffer in case we have only one block/chunk

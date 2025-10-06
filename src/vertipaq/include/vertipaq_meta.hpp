@@ -43,10 +43,10 @@ struct DataModel{
 using VertipaqFiles = std::map<std::string, VertipaqFile>;
 using VertipaqData = std::map<std::string, VertipaqDetails>;
 struct MultiThreadMetadata {
-    uint64_t main_chunks_per_thread;
-    uint64_t prefix_chunks_per_thread;
-    uint64_t prefix_thread_count;
-    uint64_t main_thread_count;
+    uint64_t tail_block_count;      // blocks per thread in tail/main section
+    uint64_t head_block_count;      // blocks per thread in head/prefix section
+    uint64_t head_thread_count;     // number of head/prefix threads
+    uint64_t tail_thread_count;     // number of tail/main threads
     uint64_t chunk_uncompressed_size;
     
     static constexpr size_t SIZE = sizeof(uint64_t) * 5; // 40 bytes

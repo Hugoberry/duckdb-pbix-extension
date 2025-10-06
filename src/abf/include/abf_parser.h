@@ -21,6 +21,7 @@ public:
     static DataModel get_sqlite(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks = 15);
 private:
     static void patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t& block_index_iterator);
+    static void patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t& block_index_iterator, uint32_t session_signature);
     static std::vector<uint8_t> read_buffer_bytes(const std::vector<uint8_t>& buffer, uint64_t offset, int size);
     static std::vector<uint8_t> trim_buffer(const std::vector<uint8_t>& buffer);
     static BackupLogHeader process_backup_log_header(const std::vector<uint8_t> &buffer);
@@ -32,8 +33,8 @@ private:
     static std::vector<uint8_t> iterate_and_decompress_blocks(duckdb::FileHandle &file_handle, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, BackupLogHeader virtual_directory, const int trailing_blocks, uint64_t &skip_offset);
     
     // Multi-threaded decompression functions
-    static std::vector<uint8_t> decompress_initial_block_multithread(duckdb::FileHandle &file_handle, uint64_t &bytes_read, XPress9Wrapper &xpress9_wrapper, MultiThreadMetadata &metadata);
-    static std::vector<uint8_t> iterate_and_decompress_chunks_multithread(duckdb::FileHandle &file_handle, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, const MultiThreadMetadata &metadata, BackupLogHeader virtual_directory, const int trailing_chunks, uint64_t &skip_offset);
+    static std::vector<uint8_t> decompress_initial_block_multithread(duckdb::FileHandle &file_handle, uint64_t &bytes_read, XPress9Wrapper &xpress9_wrapper, MultiThreadMetadata &metadata, uint32_t &first_session_signature);
+    static std::vector<uint8_t> iterate_and_decompress_chunks_multithread(duckdb::FileHandle &file_handle, uint64_t &bytes_read, uint64_t datamodel_ofs, uint64_t datamodel_size, XPress9Wrapper &xpress9_wrapper, const MultiThreadMetadata &metadata, BackupLogHeader virtual_directory, const int trailing_chunks, uint64_t &skip_offset, uint32_t first_session_signature);
 };
 
 class Header {
