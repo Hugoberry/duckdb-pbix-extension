@@ -1,6 +1,7 @@
 #include "vertipaq_decoder.hpp"
 #include <iostream>
 #include "huffman_decoder.h"
+#include "abf_parser.h"
 namespace duckdb
 {
     std::vector<uint64_t> VertipaqDecoder::readBitPacked(const std::vector<uint64_t> &sub_segment, uint64_t bit_width, uint64_t min_data_id)
@@ -186,11 +187,11 @@ namespace duckdb
         {
             throw std::runtime_error("End of central directory not found.");
         }
-        // Now, try to find a specific file in the ZIP, for example "DataModel"
+        
+        // Find the DataModel entry
         auto [datamodel_ofs, datamodel_size] = ZipUtils::findDataModel(*file_handle);
 
         uint64_t bytes_read = 0;
-        uint16_t zip_pointer = 0;
 
         // Read compressed DataModel header to adjust offset
         file_handle->Seek(datamodel_ofs + ZIP_LOCAL_FILE_HEADER_FIXED);
@@ -200,45 +201,140 @@ namespace duckdb
         file_handle->Read(reinterpret_cast<char *>(&extra_len), sizeof(extra_len));
         datamodel_ofs += ZIP_LOCAL_FILE_HEADER + filename_len + extra_len;
 
-        // auto datamodel_ofs = 0;
-        // auto datamodel_size = file_handle->GetFileSize();
+        // Detect the DataModel file type
         file_handle->Seek(datamodel_ofs);
+        std::vector<uint8_t> signature(ABF_XPRESS9_SIGNATURE);
+        file_handle->Read(reinterpret_cast<char *>(signature.data()), ABF_XPRESS9_SIGNATURE);
+        
+        // Check for single-threaded vs multi-threaded
+        bool is_multi_threaded = std::equal(
+            AbfParser::MULTI_THREAD_SIGNATURE_BYTES.begin(), 
+            AbfParser::MULTI_THREAD_SIGNATURE_BYTES.end(), 
+            signature.begin()
+        );
+        
+        bool is_single_threaded = std::equal(
+            AbfParser::SINGLE_THREAD_SIGNATURE_BYTES.begin(), 
+            AbfParser::SINGLE_THREAD_SIGNATURE_BYTES.end(), 
+            signature.begin()
+        );
+
+        if (!is_single_threaded && !is_multi_threaded) {
+            throw std::runtime_error("Unknown or unsupported DataModel file format. "
+                                    "Expected single-threaded or multi-threaded XPress9 compression.");
+        }
+
+        // Reset to beginning and initialize decompression
+        file_handle->Seek(datamodel_ofs);
+        bytes_read = 0;
+        
         XPress9Wrapper xpress9_wrapper;
         if (!xpress9_wrapper.Initialize())
         {
             throw std::runtime_error("Failed to initialize XPress9Wrapper");
         }
 
-        // Seek to the start of the DataModel compressed data
-        std::vector<uint8_t> signature(ABF_XPRESS9_SIGNATURE);
+        // Read signature
         file_handle->Read(reinterpret_cast<char *>(signature.data()), ABF_XPRESS9_SIGNATURE);
-
         bytes_read += ABF_XPRESS9_SIGNATURE;
 
-        while (bytes_read < datamodel_size)
-        {
-            uint32_t uncompressed_size;
-            uint32_t compressed_size;
-            // Read the compressed and uncompressed sizes before the offset
-            file_handle->Read(reinterpret_cast<char *>(&uncompressed_size), sizeof(uint32_t));
-            file_handle->Read(reinterpret_cast<char *>(&compressed_size), sizeof(uint32_t));
-            bytes_read += sizeof(uint32_t) + sizeof(uint32_t);
-
-            // Allocate buffers for compressed and decompressed data
-            std::vector<uint8_t> decompressed_buffer(uncompressed_size);
-            std::vector<uint8_t> compressed_buffer(compressed_size);
-
-            file_handle->Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
-            bytes_read += compressed_size;
-
-            // Decompress the entire data
-            uint32_t decompressed_size = xpress9_wrapper.Decompress(compressed_buffer.data(), compressed_size, decompressed_buffer.data(), decompressed_buffer.size());
-            // Verify that the total decompressed size matches the expected size
-            if (decompressed_size != uncompressed_size)
+        if (is_multi_threaded) {
+            // Handle multi-threaded file
+            MultiThreadMetadata metadata;
+            uint32_t first_session_signature = 0;
+            
+            // Read multi-threaded metadata
+            file_handle->Read(reinterpret_cast<char *>(&metadata.tail_block_count), sizeof(uint64_t));
+            file_handle->Read(reinterpret_cast<char *>(&metadata.head_block_count), sizeof(uint64_t));
+            file_handle->Read(reinterpret_cast<char *>(&metadata.head_thread_count), sizeof(uint64_t));
+            file_handle->Read(reinterpret_cast<char *>(&metadata.tail_thread_count), sizeof(uint64_t));
+            file_handle->Read(reinterpret_cast<char *>(&metadata.chunk_uncompressed_size), sizeof(uint64_t));
+            bytes_read += ABF_MULTITHREAD_METADATA_SIZE;
+            
+            // Calculate total number of chunks
+            uint64_t total_chunks = (metadata.head_thread_count * metadata.head_block_count) + 
+                                (metadata.tail_thread_count * metadata.tail_block_count);
+            
+            uint64_t chunk_index = 0;
+            uint32_t block_index_iterator = 0;
+            
+            // Decompress all chunks
+            while (bytes_read < datamodel_size && chunk_index < total_chunks)
             {
-                throw std::runtime_error("Mismatch in decompressed block size in first block.");
+                chunk_index++;
+                
+                uint32_t uncompressed_size = 0;
+                uint32_t compressed_size = 0;
+                file_handle->Read(reinterpret_cast<char *>(&uncompressed_size), sizeof(uint32_t));
+                file_handle->Read(reinterpret_cast<char *>(&compressed_size), sizeof(uint32_t));
+                bytes_read += sizeof(uint32_t) + sizeof(uint32_t);
+
+                std::vector<uint8_t> decompressed_buffer(uncompressed_size);
+                std::vector<uint8_t> compressed_buffer(compressed_size);
+
+                file_handle->Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
+                bytes_read += compressed_size;
+                
+                // Extract session signature from first chunk
+                if (chunk_index == 1) {
+                    Header first_header = Header::extract_from_buffer(compressed_buffer, 0);
+                    first_session_signature = first_header.session_signature;
+                } else {
+                    // Patch header: update block_index and session_signature
+                    block_index_iterator++;
+                    Header header = Header::extract_from_buffer(compressed_buffer, 0);
+                    header.block_index = block_index_iterator;
+                    header.session_signature = first_session_signature;
+                    header.update_crc();
+                    header.insert_into_buffer(compressed_buffer, 0);
+                }
+
+                // Decompress the chunk
+                uint32_t decompressed_size = xpress9_wrapper.Decompress(
+                    compressed_buffer.data(), compressed_size, 
+                    decompressed_buffer.data(), decompressed_buffer.size()
+                );
+                
+                if (decompressed_size != uncompressed_size)
+                {
+                    throw std::runtime_error("Decompression failed or resulted in unexpected size for chunk.");
+                }
+
+                all_decompressed_data.insert(all_decompressed_data.end(), 
+                                            decompressed_buffer.begin(), 
+                                            decompressed_buffer.end());
             }
-            all_decompressed_data.insert(all_decompressed_data.end(), decompressed_buffer.begin(), decompressed_buffer.end());
+        }
+        else {
+            // Handle single-threaded file (original logic)
+            while (bytes_read < datamodel_size)
+            {
+                uint32_t uncompressed_size = 0;
+                uint32_t compressed_size = 0;
+                file_handle->Read(reinterpret_cast<char *>(&uncompressed_size), sizeof(uint32_t));
+                file_handle->Read(reinterpret_cast<char *>(&compressed_size), sizeof(uint32_t));
+                bytes_read += sizeof(uint32_t) + sizeof(uint32_t);
+
+                std::vector<uint8_t> decompressed_buffer(uncompressed_size);
+                std::vector<uint8_t> compressed_buffer(compressed_size);
+
+                file_handle->Read(reinterpret_cast<char *>(compressed_buffer.data()), compressed_size);
+                bytes_read += compressed_size;
+
+                uint32_t decompressed_size = xpress9_wrapper.Decompress(
+                    compressed_buffer.data(), compressed_size, 
+                    decompressed_buffer.data(), decompressed_buffer.size()
+                );
+                
+                if (decompressed_size != uncompressed_size)
+                {
+                    throw std::runtime_error("Mismatch in decompressed block size.");
+                }
+                
+                all_decompressed_data.insert(all_decompressed_data.end(), 
+                                            decompressed_buffer.begin(), 
+                                            decompressed_buffer.end());
+            }
         }
     }
 

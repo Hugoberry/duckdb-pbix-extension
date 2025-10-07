@@ -19,6 +19,9 @@
 class AbfParser {
 public:
     static DataModel get_sqlite(duckdb::ClientContext &context, const std::string &path, const int trailing_blocks = 15);
+    static const std::vector<uint8_t> SINGLE_THREAD_SIGNATURE_BYTES;
+    static const std::vector<uint8_t> MULTI_THREAD_SIGNATURE_BYTES;
+    static const std::vector<uint8_t> STREAM_STORAGE_SIGNATURE_BYTES;
 private:
     static void patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t& block_index_iterator);
     static void patch_header_of_compressed_buffer(std::vector<uint8_t> &compressed_buffer, uint32_t& block_index_iterator, uint32_t session_signature);

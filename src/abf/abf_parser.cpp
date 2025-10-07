@@ -4,7 +4,7 @@ using namespace tinyxml2;
 using namespace duckdb;
 
 // Signature constants as UTF-16LE byte patterns
-static const std::vector<uint8_t> SINGLE_THREAD_SIGNATURE_BYTES = {
+const std::vector<uint8_t> AbfParser::SINGLE_THREAD_SIGNATURE_BYTES = {
     0x54, 0x00, 0x68, 0x00, 0x69, 0x00, 0x73, 0x00, 0x20, 0x00, 0x62, 0x00, 0x61, 0x00, 0x63, 0x00,
     0x6B, 0x00, 0x75, 0x00, 0x70, 0x00, 0x20, 0x00, 0x77, 0x00, 0x61, 0x00, 0x73, 0x00, 0x20, 0x00,
     0x63, 0x00, 0x72, 0x00, 0x65, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x64, 0x00, 0x20, 0x00,
@@ -14,7 +14,7 @@ static const std::vector<uint8_t> SINGLE_THREAD_SIGNATURE_BYTES = {
     0x6E, 0x00, 0x2E, 0x00
 }; // "This backup was created using XPress9 compression."
 
-static const std::vector<uint8_t> MULTI_THREAD_SIGNATURE_BYTES = {
+const std::vector<uint8_t> AbfParser::MULTI_THREAD_SIGNATURE_BYTES = {
     0x54, 0x00, 0x68, 0x00, 0x69, 0x00, 0x73, 0x00, 0x20, 0x00, 0x62, 0x00, 0x61, 0x00, 0x63, 0x00,
     0x6B, 0x00, 0x75, 0x00, 0x70, 0x00, 0x20, 0x00, 0x77, 0x00, 0x61, 0x00, 0x73, 0x00, 0x20, 0x00,
     0x63, 0x00, 0x72, 0x00, 0x65, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x64, 0x00, 0x20, 0x00,
@@ -24,7 +24,7 @@ static const std::vector<uint8_t> MULTI_THREAD_SIGNATURE_BYTES = {
     0x39, 0x00, 0x2E, 0x00
 }; // "This backup was created using multithreaded XPrs9."
 
-static const std::vector<uint8_t> STREAM_STORAGE_SIGNATURE_BYTES = {
+const std::vector<uint8_t> AbfParser::STREAM_STORAGE_SIGNATURE_BYTES = {
     0xFF, 0xFE, // UTF-16LE BOM
     0x53, 0x00, 0x54, 0x00, 0x52, 0x00, 0x45, 0x00, 0x41, 0x00, 0x4D, 0x00, 0x5F, 0x00, 0x53, 0x00,
     0x54, 0x00, 0x4F, 0x00, 0x52, 0x00, 0x41, 0x00, 0x47, 0x00, 0x45, 0x00, 0x5F, 0x00, 0x53, 0x00,
@@ -47,11 +47,11 @@ static DataModelType DetectDataModelType(duckdb::FileHandle &file_handle, uint64
     file_handle.Read(reinterpret_cast<char *>(signature.data()), ABF_XPRESS9_SIGNATURE);
     
     // Check for compressed file types (single-threaded or multi-threaded)
-    if (std::equal(SINGLE_THREAD_SIGNATURE_BYTES.begin(), SINGLE_THREAD_SIGNATURE_BYTES.end(), signature.begin())) {
+    if (std::equal(AbfParser::SINGLE_THREAD_SIGNATURE_BYTES.begin(), AbfParser::SINGLE_THREAD_SIGNATURE_BYTES.end(), signature.begin())) {
         return DataModelType::SINGLE_THREADED;
     }
-    
-    if (std::equal(MULTI_THREAD_SIGNATURE_BYTES.begin(), MULTI_THREAD_SIGNATURE_BYTES.end(), signature.begin())) {
+
+    if (std::equal(AbfParser::MULTI_THREAD_SIGNATURE_BYTES.begin(), AbfParser::MULTI_THREAD_SIGNATURE_BYTES.end(), signature.begin())) {
         return DataModelType::MULTI_THREADED;
     }
     
@@ -61,8 +61,8 @@ static DataModelType DetectDataModelType(duckdb::FileHandle &file_handle, uint64
     file_handle.Read(reinterpret_cast<char *>(header.data()), ABF_BACKUP_LOG_HEADER_OFFSET);
     
     auto it = std::search(header.begin(), header.end(), 
-                         STREAM_STORAGE_SIGNATURE_BYTES.begin(), 
-                         STREAM_STORAGE_SIGNATURE_BYTES.end());
+                         AbfParser::STREAM_STORAGE_SIGNATURE_BYTES.begin(), 
+                         AbfParser::STREAM_STORAGE_SIGNATURE_BYTES.end());
     if (it != header.end()) {
         return DataModelType::UNCOMPRESSED;
     }
