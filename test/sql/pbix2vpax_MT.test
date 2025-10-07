@@ -2,6 +2,8 @@
 # description: test pbix2vpax function on large DataModels
 # group: [pbix]
 
+require-env PBIX_ENVIRONMENT
+
 require pbix
 
 # Test basic function call
