@@ -72,13 +72,13 @@ true
 
 # Test measure extraction if present
 query I
-SELECT COUNT(*) >= 0 FROM (SELECT unnest(pbix2vpax('data/contoso.pbix').Measures));
+SELECT COUNT(*) >= 0 FROM (SELECT unnest(pbix2vpax('data/Contoso.pbix').Measures));
 ----
 true
 
 # Test that Relationships array is populated
 query I
-SELECT list_count(pbix2vpax('data/contoso.pbix').Relationships) >= 0 ;
+SELECT list_count(pbix2vpax('data/Contoso.pbix').Relationships) >= 0 ;
 ----
 true
 
@@ -87,7 +87,7 @@ query II
 SELECT 
     tab.TableName,
     tab.TableSize > 0
-FROM (select unnest(pbix2vpax('data/contoso.pbix').Tables) as tab) 
+FROM (select unnest(pbix2vpax('data/Contoso.pbix').Tables) as tab) 
 ORDER BY 1 LIMIT 2;
 ----
 Currency	true
@@ -98,7 +98,7 @@ query II
 SELECT 
     col.ColumnName,
     col.ColumnCardinality > 0
-FROM (select unnest(pbix2vpax('data/contoso.pbix').Columns) as col) 
+FROM (select unnest(pbix2vpax('data/Contoso.pbix').Columns) as col) 
 WHERE col.TableName = 'Currency'
 ORDER BY 1
 LIMIT 3;
@@ -112,7 +112,7 @@ query II
 SELECT 
     col.ColumnName,
     col.Encoding
-FROM (select unnest(pbix2vpax('data/contoso.pbix').Columns) as col) 
+FROM (select unnest(pbix2vpax('data/Contoso.pbix').Columns) as col) 
 WHERE col.TableName = 'Currency'
 ORDER BY 1
 LIMIT 4;
