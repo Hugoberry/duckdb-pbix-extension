@@ -96,7 +96,7 @@ pbix2vpax(filename)
 - `UserHierarchies` - User-defined hierarchies
 - `Partitions` - Partition information including refresh times
 - `ColumnsSegments` - (Reserved for future use)
-- `TablePermissions` - (Reserved for future use)
+- `TablePermissions` - Row Level Security details
 - `CalculationItems` - (Reserved for future use)
 
 #### Basic Usage
