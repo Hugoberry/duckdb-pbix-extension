@@ -145,3 +145,47 @@ statement error
 SELECT pbix2vpax('nonexistent.pbix');
 ----
 
+# Test that TablePermissions array exists (even if empty for work.pbix)
+query I
+SELECT pbix2vpax('data/work.pbix').TablePermissions IS NOT NULL;
+----
+true
+
+# Test TablePermissions structure for files that might have permissions
+query I
+SELECT list_count(pbix2vpax('data/work.pbix').TablePermissions);
+----
+0
+
+# Test TablePermissions with RLS file that should contain permissions
+query I
+SELECT list_count(pbix2vpax('data/rls.pbix').TablePermissions) > 0;
+----
+true
+
+# Test TablePermissions structure - verify it contains proper fields
+query I
+SELECT unnest(pbix2vpax('data/rls.pbix').TablePermissions).RoleName;
+----
+Dynamic RLS
+Asia
+Europe
+United States
+
+# Test TablePermissions structure - verify it contains table name
+query I
+SELECT unnest(pbix2vpax('data/rls.pbix').TablePermissions).TableName;
+----
+Regions
+Regions
+Regions
+Regions
+
+# Test TablePermissions structure - verify it contains filter expression
+query I
+SELECT unnest(pbix2vpax('data/rls.pbix').TablePermissions).FilterExpression IS NOT NULL;
+----
+true
+true
+true
+true

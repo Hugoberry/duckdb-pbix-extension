@@ -41,8 +41,4 @@ extern "C"
         LoadInternal(loader);
     }
 
-    DUCKDB_EXTENSION_API const char *pbix_version()
-    {
-        return DuckDB::LibraryVersion();
-    }
 }

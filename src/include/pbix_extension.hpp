@@ -15,8 +15,12 @@ public:
 	static std::string Name() {
 		return "pbix";
 	}
-	static std::string Version() {
-		return DuckDB::LibraryVersion();
+	std::string Version() const {
+#ifdef EXT_VERSION_PBIX
+	return EXT_VERSION_PBIX;
+#else
+	return "v0.5.0";
+#endif
 	}
 };
 

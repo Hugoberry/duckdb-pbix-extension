@@ -19,6 +19,7 @@ public:
     static LogicalType CreateColumnHierarchyType();
     static LogicalType CreateUserHierarchyType();
     static LogicalType CreatePartitionType();
+    static LogicalType CreateTablePermissionType();
     
     // Helper types
     static LogicalType CreateErrorType();
@@ -146,6 +147,12 @@ public:
         int64_t records_per_segment = 0,
         const std::string &refreshed_time = "",
         const std::string &refresh_bookmark = ""
+    );
+    
+    static Value CreateTablePermissionValue(
+        const std::string &role_name,
+        const std::string &table_name,
+        const std::string &filter_expression
     );
     
     // Error value

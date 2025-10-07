@@ -487,7 +487,25 @@
     },
     "TablePermissions": {
       "type": "array",
-      "items": {}
+      "items": {
+        "type": "object",
+        "properties": {
+          "RoleName": {
+            "type": "string"
+          },
+          "TableName": {
+            "type": "string"
+          },
+          "FilterExpression": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "RoleName",
+          "TableName",
+          "FilterExpression"
+        ]
+      }
     },
     "CalculationItems": {
       "type": "array",
