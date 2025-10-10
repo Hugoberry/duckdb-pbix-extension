@@ -425,6 +425,48 @@ After running these steps, you can install and load your extension using the reg
 INSTALL pbix
 LOAD pbix
 ```
+
+## Configuration Options
+
+The extension provides several configuration options to customize its behavior:
+
+### pbix_trailing_chunks_optimization
+Controls the number of trailing chunks to read when parsing PBIX files. This affects parsing performance and success rates for different file formats.
+
+**Default:** 15  
+**Type:** INTEGER  
+**Usage:**
+```sql
+SET pbix_trailing_chunks_optimization = 20;
+```
+
+### pbix_ignore_errors
+When enabled, `pbix2vpax()` returns empty VPAX structures instead of throwing exceptions when files cannot be parsed. This is particularly useful for batch processing scenarios where you want to continue processing other files even if some fail.
+
+**Default:** false  
+**Type:** BOOLEAN  
+**Usage:**
+```sql
+-- Enable error tolerance for batch processing
+SET pbix_ignore_errors = true;
+
+-- Process multiple files - failed files will return empty structures instead of breaking the query
+SELECT 
+    file, 
+    list_count(pbix2vpax(file).Tables) as table_count,
+    list_count(pbix2vpax(file).Columns) as column_count
+FROM glob('path/to/pbix/files/**/*.pbix')
+ORDER BY table_count DESC;
+
+-- Reset to default behavior
+SET pbix_ignore_errors = false;
+```
+
+**Common use cases:**
+- Batch analysis of multiple PBIX files where some may be corrupted
+- Data quality assessments across file collections
+- Automated processing pipelines that should continue despite individual file failures
+
 ## Limitations/Bugs/Features/TODO
 * The WASM version can't parse `https` hosted files
 * ~~pbix_read() doesn't let you select only specific columns; you need to CTE to pick the output columns~~

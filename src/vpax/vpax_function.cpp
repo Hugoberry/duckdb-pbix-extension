@@ -21,9 +21,9 @@ void VpaxFunction::Execute(DataChunk &args, ExpressionState &state, Vector &resu
             
             // Get trailing chunks from config (default 15)
             int trailing_chunks = 15;
-            Value magic_number;
-            if (state.GetContext().TryGetCurrentSetting("pbix_magic_number", magic_number)) {
-                trailing_chunks = IntegerValue::Get(magic_number);
+            Value trailing_chunks_value;
+            if (state.GetContext().TryGetCurrentSetting("pbix_trailing_chunks_optimization", trailing_chunks_value)) {
+                trailing_chunks = IntegerValue::Get(trailing_chunks_value);
             }
             
             // Parse PBIX file
@@ -38,9 +38,21 @@ void VpaxFunction::Execute(DataChunk &args, ExpressionState &state, Vector &resu
             result.SetValue(i, vpax_result);
             
         } catch (const std::exception &e) {
-           // Create empty VPAX structure on error (maintains type consistency)
-           throw InvalidInputException("Failed to call pbix2vpax() for file '%s': %s", 
-                                      file_name.c_str(), e.what()); 
+            // Check if errors should be ignored
+            Value ignore_errors;
+            bool should_ignore = false;
+            if (state.GetContext().TryGetCurrentSetting("pbix_ignore_errors", ignore_errors)) {
+                should_ignore = BooleanValue::Get(ignore_errors);
+            }
+            
+            if (should_ignore) {
+                // Return empty VPAX structure instead of throwing
+                result.SetValue(i, VpaxValueFactory::CreateEmptyVpaxValue());
+            } else {
+                // Create empty VPAX structure on error (maintains type consistency)
+                throw InvalidInputException("Failed to call pbix2vpax() for file '%s': %s", 
+                                          file_name.c_str(), e.what()); 
+            }
         }
     }
 }

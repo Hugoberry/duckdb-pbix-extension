@@ -295,3 +295,20 @@ Value VpaxValueFactory::CreateErrorValue(
     
     return Value::STRUCT(error_values);
 }
+
+Value VpaxValueFactory::CreateEmptyVpaxValue() {
+    // Create the main VPAX structure with empty lists for all sections
+    child_list_t<Value> vpax_values;
+    vpax_values.push_back(make_pair("Tables", Value::LIST(VpaxSchema::CreateTableType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("Columns", Value::LIST(VpaxSchema::CreateColumnType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("Measures", Value::LIST(VpaxSchema::CreateMeasureType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("ColumnsSegments", Value::LIST(VpaxSchema::CreateColumnSegmentType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("ColumnsHierarchies", Value::LIST(VpaxSchema::CreateColumnHierarchyType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("UserHierarchies", Value::LIST(VpaxSchema::CreateUserHierarchyType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("Relationships", Value::LIST(VpaxSchema::CreateRelationshipType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("Partitions", Value::LIST(VpaxSchema::CreatePartitionType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("TablePermissions", Value::LIST(VpaxSchema::CreateTablePermissionType(), std::vector<Value>())));
+    vpax_values.push_back(make_pair("CalculationItems", Value::LIST(LogicalType::VARCHAR, std::vector<Value>())));
+    
+    return Value::STRUCT(vpax_values);
+}

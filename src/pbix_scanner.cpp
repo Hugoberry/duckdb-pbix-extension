@@ -61,10 +61,10 @@ static unique_ptr<FunctionData> PbixBind(ClientContext &context, TableFunctionBi
 	result->file_name = input.inputs[0].GetValue<string>();
 	result->table_name = input.inputs[1].GetValue<string>();
 	result->trailing_chunks = 15; // Empirically proven to be a good value
-	Value pbix_magic_number;
+	Value trailing_chunks_value;
 
-	if (context.TryGetCurrentSetting("pbix_magic_number", pbix_magic_number)) {
-		result->trailing_chunks = IntegerValue::Get(pbix_magic_number);
+	if (context.TryGetCurrentSetting("pbix_trailing_chunks_optimization", trailing_chunks_value)) {
+		result->trailing_chunks = IntegerValue::Get(trailing_chunks_value);
 	}
 
 	SQLiteDB db;
@@ -110,10 +110,10 @@ static void PbixInitInternal(ClientContext &context, const PbixBindData &bind_da
 		SQLiteOpenOptions options;
 		options.access_mode = AccessMode::READ_ONLY;
 		int trailing_chunks = bind_data.trailing_chunks;
-		Value pbix_magic_number;
+		Value trailing_chunks_value;
 
-		if (context.TryGetCurrentSetting("pbix_magic_number", pbix_magic_number)) {
-			trailing_chunks = IntegerValue::Get(pbix_magic_number);
+		if (context.TryGetCurrentSetting("pbix_trailing_chunks_optimization", trailing_chunks_value)) {
+			trailing_chunks = IntegerValue::Get(trailing_chunks_value);
 		}
 
 		local_state.owned_db = ExtractDB(context, bind_data.file_name.c_str(), trailing_chunks);
