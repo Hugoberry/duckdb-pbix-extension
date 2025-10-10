@@ -111,21 +111,12 @@ SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Tables).TableName;
 SELECT pbix2vpax('Adventure Works DW 2020.pbix');
 ```
 
-**Count tables and columns:**
-```sql
-SELECT 
-    list_count(pbix2vpax('Adventure Works DW 2020.pbix').Tables) as table_count,
-    list_count(pbix2vpax('Adventure Works DW 2020.pbix').Columns) as column_count;
-```
-
 **Analyze table sizes:**
 ```sql
 SELECT 
     tab.TableName,
     tab.RowsCount,
-    tab.TableSize / 1024.0 / 1024.0 as TableSizeMB,
-    tab.ColumnsSize / 1024.0 / 1024.0 as ColumnsSizeMB,
-    tab.RelationshipsSize / 1024.0 / 1024.0 as RelationshipsSizeMB
+    tab.TableSize / 1024.0 / 1024.0 as TableSizeMB
 FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Tables) as tab)
 ORDER BY tab.TableSize DESC;
 ```
@@ -159,47 +150,8 @@ ORDER BY MeasureCount DESC;
 **Examine relationships:**
 ```sql
 SELECT 
-    rel.FromTableName,
-    rel.FromFullColumnName,
-    rel.ToTableName,
-    rel.ToFullColumnName,
-    rel.FromCardinalityType,
-    rel.ToCardinalityType,
-    rel.IsActive,
-    rel.CrossFilteringBehavior,
-    rel.UsedSize / 1024.0 / 1024.0 as RelationshipSizeMB
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Relationships) as rel)
-ORDER BY rel.UsedSize DESC;
-```
-
-**Check encoding efficiency:**
-```sql
-SELECT 
-    col.TableName,
-    col.ColumnName,
-    col.Encoding,
-    col.ColumnCardinality,
-    col.TotalSize / 1024.0 / 1024.0 as SizeMB,
-    CASE 
-        WHEN col.ColumnCardinality > 0 
-        THEN col.TotalSize::DOUBLE / col.ColumnCardinality 
-        ELSE 0 
-    END as BytesPerValue
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Columns) as col)
-WHERE col.ColumnCardinality > 0
-ORDER BY BytesPerValue DESC
-LIMIT 10;
-```
-
-**Analyze hierarchies:**
-```sql
-SELECT 
-    hier.TableName,
-    hier.UserHierarchyName,
-    hier.Levels,
-    hier.UsedSize / 1024.0 / 1024.0 as HierarchySizeMB
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').UserHierarchies) as hier)
-ORDER BY hier.UsedSize DESC;
+    rel.*
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Relationships) as rel);
 ```
 
 **Partition refresh status:**
@@ -210,7 +162,8 @@ SELECT
     part.RecordCount,
     part.SegmentCount,
     part.RefreshedTime,
-    part.RecordsPerSegment
+    part.RecordsPerSegment,
+    paart.QueryDefinition
 FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Partitions) as part)
 ORDER BY part.RecordCount DESC;
 ```
@@ -220,12 +173,12 @@ ORDER BY part.RecordCount DESC;
 **Model size breakdown:**
 ```sql
 WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
+    SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Tables) as t
 ),
 table_sizes AS (
     SELECT 
-        UNNEST(vpax.analysis.Tables).TableName as TableName,
-        UNNEST(vpax.analysis.Tables).TableSize as TableSize
+        t.TableName,
+        t.TableSize
     FROM vpax
 )
 SELECT 
@@ -234,43 +187,6 @@ SELECT
     100.0 * TableSize / SUM(TableSize) OVER () as PercentOfTotal
 FROM table_sizes
 ORDER BY TableSize DESC;
-```
-
-**High cardinality columns analysis:**
-```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
-SELECT 
-    col.TableName,
-    col.ColumnName,
-    col.ColumnCardinality,
-    col.TotalSize / 1024.0 / 1024.0 as SizeMB,
-    col.Encoding,
-    CASE 
-        WHEN col.ColumnCardinality > 1000000 THEN 'Very High'
-        WHEN col.ColumnCardinality > 100000 THEN 'High'
-        WHEN col.ColumnCardinality > 10000 THEN 'Medium'
-        ELSE 'Low'
-    END as CardinalityLevel
-FROM (SELECT UNNEST(vpax.analysis.Columns) as col FROM vpax)
-WHERE col.ColumnCardinality > 0
-ORDER BY col.ColumnCardinality DESC;
-```
-
-**Relationship network analysis:**
-```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
-SELECT 
-    rel.FromTableName,
-    rel.ToTableName,
-    COUNT(*) as RelationshipCount,
-    SUM(rel.UsedSize) / 1024.0 / 1024.0 as TotalRelationshipSizeMB
-FROM (SELECT UNNEST(vpax.analysis.Relationships) as rel FROM vpax)
-GROUP BY rel.FromTableName, rel.ToTableName
-ORDER BY RelationshipCount DESC;
 ```
 
 **Measure catalog with expressions:**
@@ -287,25 +203,11 @@ WHERE NOT meas.IsHidden
 ORDER BY meas.TableName, meas.MeasureName;
 ```
 
-**Column type distribution:**
-```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
-SELECT 
-    col.DataType,
-    COUNT(*) as ColumnCount,
-    SUM(col.TotalSize) / 1024.0 / 1024.0 as TotalSizeMB,
-    AVG(col.ColumnCardinality) as AvgCardinality
-FROM (SELECT UNNEST(vpax.analysis.Columns) as col FROM vpax)
-GROUP BY col.DataType
-ORDER BY ColumnCount DESC;
-```
 
 **Export to JSON for external analysis:**
 ```sql
 COPY (
-    SELECT to_json(pbix2vpax('Adventure Works DW 2020.pbix'))
+    SELECT pbix2vpax('Adventure Works DW 2020.pbix')
 ) TO 'model_analysis.json';
 ```
 
@@ -348,82 +250,11 @@ SELECT * FROM model_b
 ORDER BY ModelName, TableSize DESC;
 ```
 
-**Find columns that could benefit from optimization:**
+## Installing the extension
+
 ```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
-SELECT 
-    col.TableName,
-    col.ColumnName,
-    col.Encoding,
-    col.ColumnCardinality,
-    col.TotalSize / 1024.0 / 1024.0 as SizeMB,
-    CASE 
-        WHEN col.Encoding = 'HASH' AND col.ColumnCardinality < 1000 
-        THEN 'Consider VALUE encoding'
-        WHEN col.ColumnCardinality > 1000000 
-        THEN 'Very high cardinality - review if needed'
-        ELSE 'OK'
-    END as Recommendation
-FROM (SELECT UNNEST(vpax.analysis.Columns) as col FROM vpax)
-WHERE col.TotalSize > 1048576  -- Larger than 1MB
-ORDER BY col.TotalSize DESC
-LIMIT 20;
-```
-
-**Relationship health check:**
-```sql
-SELECT 
-    rel.FromTableName,
-    rel.ToTableName,
-    rel.RelationshipType,
-    rel.IsActive,
-    rel.CrossFilteringBehavior,
-    CASE 
-        WHEN NOT rel.IsActive THEN 'Inactive relationship'
-        WHEN rel.CrossFilteringBehavior = 'BothDirections' THEN 'Bidirectional - review performance'
-        WHEN NOT rel.RelyOnReferentialIntegrity THEN 'RI not assumed - may impact performance'
-        ELSE 'OK'
-    END as HealthCheck
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Relationships) as rel)
-ORDER BY rel.FromTableName, rel.ToTableName;
-```
-
-## Running the tests
-Different tests can be created for DuckDB extensions. The primary way of testing DuckDB extensions should be the SQL tests in `./test/sql`. These SQL tests can be run using:
-```sh
-make test
-```
-
-### Installing the deployed binaries
-You will need to do two things to install your extension binaries from S3. Firstly, DuckDB should be launched with the
-`allow_unsigned_extensions` option set to true. How to set this will depend on the client you're using. Some examples:
-
-CLI:
-```shell
-duckdb -unsigned
-```
-
-Python:
-```python
-con = duckdb.connect(':memory:', config={'allow_unsigned_extensions' : 'true'})
-```
-
-NodeJS:
-```js
-db = new duckdb.Database(':memory:', {"allow_unsigned_extensions": "true"});
-```
-
-Secondly, you must set the repository endpoint in DuckDB to the HTTP URL of your bucket + version of the extension
-you want to install. To do this, run the following SQL query in DuckDB:
-```sql
-SET custom_extension_repository='https://duckdb.pbix.info';
-```
-After running these steps, you can install and load your extension using the regular INSTALL/LOAD commands in DuckDB:
-```sql
-INSTALL pbix
-LOAD pbix
+INSTALL pbix FROM community;
+LOAD pbix;
 ```
 
 ## Configuration Options
