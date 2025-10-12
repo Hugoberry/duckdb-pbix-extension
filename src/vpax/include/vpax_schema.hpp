@@ -161,6 +161,9 @@ public:
         const std::string &file_name,
         const std::string &section = ""
     );
+    
+    // Empty VPAX structure for error handling
+    static Value CreateEmptyVpaxValue();
 };
 
 } // namespace duckdb

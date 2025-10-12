@@ -1,0 +1,52 @@
+# name: test/sql/pbix_config_params.test
+# description: test pbix configuration parameters
+# group: [pbix]
+
+require-env PBIX_ENVIRONMENT
+
+require pbix
+
+# Test 1: Default behavior - errors should be thrown for non-existent files
+statement error
+SELECT pbix2vpax('nonexistent.pbix');
+----
+Invalid Input Error: Failed to call pbix2vpax() for file 'nonexistent.pbix'
+
+# Test 2: With pbix_ignore_errors = true, should return empty VPAX structure
+statement ok
+SET pbix_ignore_errors = true;
+
+query I
+SELECT list_count(pbix2vpax('nonexistent.pbix').Tables) = 0;
+----
+true
+
+# Test 3: Empty structure should have all required fields with correct types
+query III
+SELECT 
+    list_count(pbix2vpax('nonexistent.pbix').Tables) as table_count,
+    list_count(pbix2vpax('nonexistent.pbix').Columns) as column_count,
+    list_count(pbix2vpax('nonexistent.pbix').Measures) as measure_count;
+----
+0	0	0
+
+# Test 4: Reset to default behavior and test trailing chunks optimization
+statement ok
+SET pbix_ignore_errors = false;
+
+# Test 5: Setting trailing chunks too low should cause failure for complex files
+statement ok
+SET pbix_trailing_chunks_optimization = 2;
+
+statement error
+SELECT pbix2vpax('data/Power/meta2.pbix');
+----
+
+# Test 6: Setting trailing chunks to proper value should work
+statement ok
+SET pbix_trailing_chunks_optimization = 20;
+
+query I
+SELECT list_count(pbix2vpax('data/Power/meta2.pbix').Tables) > 0;
+----
+true

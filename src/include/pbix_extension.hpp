@@ -19,7 +19,7 @@ public:
 #ifdef EXT_VERSION_PBIX
 	return EXT_VERSION_PBIX;
 #else
-	return "v0.5.0";
+	return "v0.5.1";
 #endif
 	}
 };

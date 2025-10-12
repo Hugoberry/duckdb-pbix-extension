@@ -28,7 +28,8 @@ extern "C"
 
         auto &db = loader.GetDatabaseInstance();
         auto &config = DBConfig::GetConfig(db);
-	    config.AddExtensionOption("pbix_magic_number", "A magic number to accelerate file parsing", LogicalType::INTEGER);
+	    config.AddExtensionOption("pbix_trailing_chunks_optimization", "Number of trailing chunks to read for optimized file parsing", LogicalType::INTEGER);
+	    config.AddExtensionOption("pbix_ignore_errors", "Return empty VPAX structure instead of throwing exceptions on parse errors", LogicalType::BOOLEAN);
     }
 
     void PbixExtension::Load(ExtensionLoader &loader)

@@ -111,21 +111,12 @@ SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Tables).TableName;
 SELECT pbix2vpax('Adventure Works DW 2020.pbix');
 ```
 
-**Count tables and columns:**
-```sql
-SELECT 
-    list_count(pbix2vpax('Adventure Works DW 2020.pbix').Tables) as table_count,
-    list_count(pbix2vpax('Adventure Works DW 2020.pbix').Columns) as column_count;
-```
-
 **Analyze table sizes:**
 ```sql
 SELECT 
     tab.TableName,
     tab.RowsCount,
-    tab.TableSize / 1024.0 / 1024.0 as TableSizeMB,
-    tab.ColumnsSize / 1024.0 / 1024.0 as ColumnsSizeMB,
-    tab.RelationshipsSize / 1024.0 / 1024.0 as RelationshipsSizeMB
+    tab.TableSize / 1024.0 / 1024.0 as TableSizeMB
 FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Tables) as tab)
 ORDER BY tab.TableSize DESC;
 ```
@@ -159,47 +150,8 @@ ORDER BY MeasureCount DESC;
 **Examine relationships:**
 ```sql
 SELECT 
-    rel.FromTableName,
-    rel.FromFullColumnName,
-    rel.ToTableName,
-    rel.ToFullColumnName,
-    rel.FromCardinalityType,
-    rel.ToCardinalityType,
-    rel.IsActive,
-    rel.CrossFilteringBehavior,
-    rel.UsedSize / 1024.0 / 1024.0 as RelationshipSizeMB
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Relationships) as rel)
-ORDER BY rel.UsedSize DESC;
-```
-
-**Check encoding efficiency:**
-```sql
-SELECT 
-    col.TableName,
-    col.ColumnName,
-    col.Encoding,
-    col.ColumnCardinality,
-    col.TotalSize / 1024.0 / 1024.0 as SizeMB,
-    CASE 
-        WHEN col.ColumnCardinality > 0 
-        THEN col.TotalSize::DOUBLE / col.ColumnCardinality 
-        ELSE 0 
-    END as BytesPerValue
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Columns) as col)
-WHERE col.ColumnCardinality > 0
-ORDER BY BytesPerValue DESC
-LIMIT 10;
-```
-
-**Analyze hierarchies:**
-```sql
-SELECT 
-    hier.TableName,
-    hier.UserHierarchyName,
-    hier.Levels,
-    hier.UsedSize / 1024.0 / 1024.0 as HierarchySizeMB
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').UserHierarchies) as hier)
-ORDER BY hier.UsedSize DESC;
+    rel.*
+FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Relationships) as rel);
 ```
 
 **Partition refresh status:**
@@ -210,221 +162,115 @@ SELECT
     part.RecordCount,
     part.SegmentCount,
     part.RefreshedTime,
-    part.RecordsPerSegment
+    part.RecordsPerSegment,
+    paart.QueryDefinition
 FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Partitions) as part)
 ORDER BY part.RecordCount DESC;
 ```
 
 #### Advanced Analysis Examples
 
-**Model size breakdown:**
-```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-),
-table_sizes AS (
-    SELECT 
-        UNNEST(vpax.analysis.Tables).TableName as TableName,
-        UNNEST(vpax.analysis.Tables).TableSize as TableSize
-    FROM vpax
-)
-SELECT 
-    TableName,
-    TableSize / 1024.0 / 1024.0 as SizeMB,
-    100.0 * TableSize / SUM(TableSize) OVER () as PercentOfTotal
-FROM table_sizes
-ORDER BY TableSize DESC;
-```
-
-**High cardinality columns analysis:**
-```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
-SELECT 
-    col.TableName,
-    col.ColumnName,
-    col.ColumnCardinality,
-    col.TotalSize / 1024.0 / 1024.0 as SizeMB,
-    col.Encoding,
-    CASE 
-        WHEN col.ColumnCardinality > 1000000 THEN 'Very High'
-        WHEN col.ColumnCardinality > 100000 THEN 'High'
-        WHEN col.ColumnCardinality > 10000 THEN 'Medium'
-        ELSE 'Low'
-    END as CardinalityLevel
-FROM (SELECT UNNEST(vpax.analysis.Columns) as col FROM vpax)
-WHERE col.ColumnCardinality > 0
-ORDER BY col.ColumnCardinality DESC;
-```
-
-**Relationship network analysis:**
-```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
-SELECT 
-    rel.FromTableName,
-    rel.ToTableName,
-    COUNT(*) as RelationshipCount,
-    SUM(rel.UsedSize) / 1024.0 / 1024.0 as TotalRelationshipSizeMB
-FROM (SELECT UNNEST(vpax.analysis.Relationships) as rel FROM vpax)
-GROUP BY rel.FromTableName, rel.ToTableName
-ORDER BY RelationshipCount DESC;
-```
-
-**Measure catalog with expressions:**
+**Find all models containing a specific measure:**
 ```sql
 SELECT 
+    file,
     meas.TableName,
     meas.MeasureName,
-    meas.DataType,
     meas.MeasureExpression,
-    meas.FormatString,
-    meas.IsHidden
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Measures) as meas)
-WHERE NOT meas.IsHidden
-ORDER BY meas.TableName, meas.MeasureName;
+    list_count((SELECT pbix2vpax(file).Tables)) as TotalTables,
+    (SELECT SUM(t.TableSize) FROM (SELECT UNNEST(pbix2vpax(file).Tables) as t)) / 1024.0 / 1024.0 as ModelSizeMB
+FROM (
+    SELECT unnest(glob('data/reports/**/*.pbix')) as file
+) files,
+LATERAL (
+    SELECT UNNEST(pbix2vpax(file).Measures) as meas
+)
+WHERE LOWER(meas.MeasureName) LIKE '%total sales%'
+   OR LOWER(meas.MeasureExpression) LIKE '%total sales%'
+ORDER BY file, meas.TableName, meas.MeasureName;
 ```
 
-**Column type distribution:**
+**Audit model freshness and size across a folder:**
 ```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
 SELECT 
-    col.DataType,
-    COUNT(*) as ColumnCount,
-    SUM(col.TotalSize) / 1024.0 / 1024.0 as TotalSizeMB,
-    AVG(col.ColumnCardinality) as AvgCardinality
-FROM (SELECT UNNEST(vpax.analysis.Columns) as col FROM vpax)
-GROUP BY col.DataType
-ORDER BY ColumnCount DESC;
+    REGEXP_EXTRACT(file, '([^/]+)\.pbix$', 1) as FileName,
+    list_count(vpax.Tables) as TableCount,
+    list_count(vpax.Measures) as MeasureCount,
+    list_count(vpax.Relationships) as RelationshipCount,
+    SUM(tab.RowsCount) as TotalRows,
+    SUM(tab.TableSize) / 1024.0 / 1024.0 as ModelSizeMB,
+    MAX(part.RefreshedTime) as LastRefreshTime,
+    CASE 
+        WHEN MAX(part.RefreshedTime) < CURRENT_DATE - INTERVAL '7 days' THEN '⚠️ Stale'
+        WHEN MAX(part.RefreshedTime) < CURRENT_DATE - INTERVAL '2 days' THEN '⚡ Recent'
+        ELSE '✅ Fresh'
+    END as FreshnessStatus
+FROM (
+    SELECT 
+        unnest(glob('data/reports/**/*.pbix')) as file,
+        pbix2vpax(unnest(glob('data/reports/**/*.pbix'))) as vpax
+),
+LATERAL (SELECT UNNEST(vpax.Tables) as tab),
+LATERAL (SELECT UNNEST(vpax.Partitions) as part)
+GROUP BY file
+ORDER BY LastRefreshTime DESC;
 ```
 
 **Export to JSON for external analysis:**
 ```sql
 COPY (
-    SELECT to_json(pbix2vpax('Adventure Works DW 2020.pbix'))
+    SELECT pbix2vpax('Adventure Works DW 2020.pbix')
 ) TO 'model_analysis.json';
 ```
 
-**Create a summary report:**
+## Installing the extension
+
 ```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
+INSTALL pbix FROM community;
+LOAD pbix;
+```
+
+## Configuration Options
+
+The extension provides several configuration options to customize its behavior:
+
+### pbix_trailing_chunks_optimization
+Controls the number of trailing chunks to read when parsing PBIX files. This affects parsing performance and success rates for different file formats.
+
+**Default:** 15  
+**Type:** INTEGER  
+**Usage:**
+```sql
+SET pbix_trailing_chunks_optimization = 20;
+```
+
+### pbix_ignore_errors
+When enabled, `pbix2vpax()` returns empty VPAX structures instead of throwing exceptions when files cannot be parsed. This is particularly useful for batch processing scenarios where you want to continue processing other files even if some fail.
+
+**Default:** false  
+**Type:** BOOLEAN  
+**Usage:**
+```sql
+-- Enable error tolerance for batch processing
+SET pbix_ignore_errors = true;
+
+-- Process multiple files - failed files will return empty structures instead of breaking the query
 SELECT 
-    'Model Summary' as Section,
-    list_count(vpax.analysis.Tables) as TableCount,
-    list_count(vpax.analysis.Columns) as ColumnCount,
-    list_count(vpax.analysis.Measures) as MeasureCount,
-    list_count(vpax.analysis.Relationships) as RelationshipCount,
-    list_count(vpax.analysis.UserHierarchies) as HierarchyCount,
-    (SELECT SUM(tab.TableSize) FROM (SELECT UNNEST(vpax.analysis.Tables) as tab)) / 1024.0 / 1024.0 as TotalModelSizeMB
-FROM vpax;
+    file, 
+    list_count(pbix2vpax(file).Tables) as table_count,
+    list_count(pbix2vpax(file).Columns) as column_count
+FROM glob('path/to/pbix/files/**/*.pbix')
+ORDER BY table_count DESC;
+
+-- Reset to default behavior
+SET pbix_ignore_errors = false;
 ```
 
-**Compare multiple models:**
-```sql
-WITH 
-model_a AS (
-    SELECT 
-        'Model A' as ModelName,
-        UNNEST(pbix2vpax('model_a.pbix').Tables).TableName as TableName,
-        UNNEST(pbix2vpax('model_a.pbix').Tables).RowsCount as RowCount,
-        UNNEST(pbix2vpax('model_a.pbix').Tables).TableSize as TableSize
-),
-model_b AS (
-    SELECT 
-        'Model B' as ModelName,
-        UNNEST(pbix2vpax('model_b.pbix').Tables).TableName as TableName,
-        UNNEST(pbix2vpax('model_b.pbix').Tables).RowsCount as RowCount,
-        UNNEST(pbix2vpax('model_b.pbix').Tables).TableSize as TableSize
-)
-SELECT * FROM model_a
-UNION ALL
-SELECT * FROM model_b
-ORDER BY ModelName, TableSize DESC;
-```
+**Common use cases:**
+- Batch analysis of multiple PBIX files where some may be corrupted
+- Data quality assessments across file collections
+- Automated processing pipelines that should continue despite individual file failures
 
-**Find columns that could benefit from optimization:**
-```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
-SELECT 
-    col.TableName,
-    col.ColumnName,
-    col.Encoding,
-    col.ColumnCardinality,
-    col.TotalSize / 1024.0 / 1024.0 as SizeMB,
-    CASE 
-        WHEN col.Encoding = 'HASH' AND col.ColumnCardinality < 1000 
-        THEN 'Consider VALUE encoding'
-        WHEN col.ColumnCardinality > 1000000 
-        THEN 'Very high cardinality - review if needed'
-        ELSE 'OK'
-    END as Recommendation
-FROM (SELECT UNNEST(vpax.analysis.Columns) as col FROM vpax)
-WHERE col.TotalSize > 1048576  -- Larger than 1MB
-ORDER BY col.TotalSize DESC
-LIMIT 20;
-```
-
-**Relationship health check:**
-```sql
-SELECT 
-    rel.FromTableName,
-    rel.ToTableName,
-    rel.RelationshipType,
-    rel.IsActive,
-    rel.CrossFilteringBehavior,
-    CASE 
-        WHEN NOT rel.IsActive THEN 'Inactive relationship'
-        WHEN rel.CrossFilteringBehavior = 'BothDirections' THEN 'Bidirectional - review performance'
-        WHEN NOT rel.RelyOnReferentialIntegrity THEN 'RI not assumed - may impact performance'
-        ELSE 'OK'
-    END as HealthCheck
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Relationships) as rel)
-ORDER BY rel.FromTableName, rel.ToTableName;
-```
-
-## Running the tests
-Different tests can be created for DuckDB extensions. The primary way of testing DuckDB extensions should be the SQL tests in `./test/sql`. These SQL tests can be run using:
-```sh
-make test
-```
-
-### Installing the deployed binaries
-You will need to do two things to install your extension binaries from S3. Firstly, DuckDB should be launched with the
-`allow_unsigned_extensions` option set to true. How to set this will depend on the client you're using. Some examples:
-
-CLI:
-```shell
-duckdb -unsigned
-```
-
-Python:
-```python
-con = duckdb.connect(':memory:', config={'allow_unsigned_extensions' : 'true'})
-```
-
-NodeJS:
-```js
-db = new duckdb.Database(':memory:', {"allow_unsigned_extensions": "true"});
-```
-
-Secondly, you must set the repository endpoint in DuckDB to the HTTP URL of your bucket + version of the extension
-you want to install. To do this, run the following SQL query in DuckDB:
-```sql
-SET custom_extension_repository='https://duckdb.pbix.info';
-```
-After running these steps, you can install and load your extension using the regular INSTALL/LOAD commands in DuckDB:
-```sql
-INSTALL pbix
-LOAD pbix
-```
 ## Limitations/Bugs/Features/TODO
 * The WASM version can't parse `https` hosted files
 * ~~pbix_read() doesn't let you select only specific columns; you need to CTE to pick the output columns~~
