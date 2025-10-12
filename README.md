@@ -170,84 +170,57 @@ ORDER BY part.RecordCount DESC;
 
 #### Advanced Analysis Examples
 
-**Model size breakdown:**
-```sql
-WITH vpax AS (
-    SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Tables) as t
-),
-table_sizes AS (
-    SELECT 
-        t.TableName,
-        t.TableSize
-    FROM vpax
-)
-SELECT 
-    TableName,
-    TableSize / 1024.0 / 1024.0 as SizeMB,
-    100.0 * TableSize / SUM(TableSize) OVER () as PercentOfTotal
-FROM table_sizes
-ORDER BY TableSize DESC;
-```
-
-**Measure catalog with expressions:**
+**Find all models containing a specific measure:**
 ```sql
 SELECT 
+    file,
     meas.TableName,
     meas.MeasureName,
-    meas.DataType,
     meas.MeasureExpression,
-    meas.FormatString,
-    meas.IsHidden
-FROM (SELECT UNNEST(pbix2vpax('Adventure Works DW 2020.pbix').Measures) as meas)
-WHERE NOT meas.IsHidden
-ORDER BY meas.TableName, meas.MeasureName;
+    list_count((SELECT pbix2vpax(file).Tables)) as TotalTables,
+    (SELECT SUM(t.TableSize) FROM (SELECT UNNEST(pbix2vpax(file).Tables) as t)) / 1024.0 / 1024.0 as ModelSizeMB
+FROM (
+    SELECT unnest(glob('data/reports/**/*.pbix')) as file
+) files,
+LATERAL (
+    SELECT UNNEST(pbix2vpax(file).Measures) as meas
+)
+WHERE LOWER(meas.MeasureName) LIKE '%total sales%'
+   OR LOWER(meas.MeasureExpression) LIKE '%total sales%'
+ORDER BY file, meas.TableName, meas.MeasureName;
 ```
 
+**Audit model freshness and size across a folder:**
+```sql
+SELECT 
+    REGEXP_EXTRACT(file, '([^/]+)\.pbix$', 1) as FileName,
+    list_count(vpax.Tables) as TableCount,
+    list_count(vpax.Measures) as MeasureCount,
+    list_count(vpax.Relationships) as RelationshipCount,
+    SUM(tab.RowsCount) as TotalRows,
+    SUM(tab.TableSize) / 1024.0 / 1024.0 as ModelSizeMB,
+    MAX(part.RefreshedTime) as LastRefreshTime,
+    CASE 
+        WHEN MAX(part.RefreshedTime) < CURRENT_DATE - INTERVAL '7 days' THEN '⚠️ Stale'
+        WHEN MAX(part.RefreshedTime) < CURRENT_DATE - INTERVAL '2 days' THEN '⚡ Recent'
+        ELSE '✅ Fresh'
+    END as FreshnessStatus
+FROM (
+    SELECT 
+        unnest(glob('data/reports/**/*.pbix')) as file,
+        pbix2vpax(unnest(glob('data/reports/**/*.pbix'))) as vpax
+),
+LATERAL (SELECT UNNEST(vpax.Tables) as tab),
+LATERAL (SELECT UNNEST(vpax.Partitions) as part)
+GROUP BY file
+ORDER BY LastRefreshTime DESC;
+```
 
 **Export to JSON for external analysis:**
 ```sql
 COPY (
     SELECT pbix2vpax('Adventure Works DW 2020.pbix')
 ) TO 'model_analysis.json';
-```
-
-**Create a summary report:**
-```sql
-WITH vpax AS (
-    SELECT pbix2vpax('Adventure Works DW 2020.pbix') as analysis
-)
-SELECT 
-    'Model Summary' as Section,
-    list_count(vpax.analysis.Tables) as TableCount,
-    list_count(vpax.analysis.Columns) as ColumnCount,
-    list_count(vpax.analysis.Measures) as MeasureCount,
-    list_count(vpax.analysis.Relationships) as RelationshipCount,
-    list_count(vpax.analysis.UserHierarchies) as HierarchyCount,
-    (SELECT SUM(tab.TableSize) FROM (SELECT UNNEST(vpax.analysis.Tables) as tab)) / 1024.0 / 1024.0 as TotalModelSizeMB
-FROM vpax;
-```
-
-**Compare multiple models:**
-```sql
-WITH 
-model_a AS (
-    SELECT 
-        'Model A' as ModelName,
-        UNNEST(pbix2vpax('model_a.pbix').Tables).TableName as TableName,
-        UNNEST(pbix2vpax('model_a.pbix').Tables).RowsCount as RowCount,
-        UNNEST(pbix2vpax('model_a.pbix').Tables).TableSize as TableSize
-),
-model_b AS (
-    SELECT 
-        'Model B' as ModelName,
-        UNNEST(pbix2vpax('model_b.pbix').Tables).TableName as TableName,
-        UNNEST(pbix2vpax('model_b.pbix').Tables).RowsCount as RowCount,
-        UNNEST(pbix2vpax('model_b.pbix').Tables).TableSize as TableSize
-)
-SELECT * FROM model_a
-UNION ALL
-SELECT * FROM model_b
-ORDER BY ModelName, TableSize DESC;
 ```
 
 ## Installing the extension
