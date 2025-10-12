@@ -377,7 +377,7 @@ std::vector<Value> VpaxBuilder::BuildColumns(const PreFetchedData &prefetched) {
     
     std::string sql = R"(
         SELECT 
-            c.ExplicitName as ColumnName,
+            COALESCE(c.ExplicitName, c.InferredName) as ColumnName,
             t.Name as TableName,
             c.ExplicitDataType,
             c.isHidden,
@@ -550,9 +550,9 @@ std::vector<Value> VpaxBuilder::BuildRelationships() {
     std::string sql = R"(
         SELECT 
             ft.Name AS FromTableName,
-            fc.ExplicitName AS FromColumnName,
+            COALESCE(fc.ExplicitName, fc.InferredName) AS FromColumnName,
             tt.Name AS ToTableName,
-            tc.ExplicitName AS ToColumnName,
+            COALESCE(tc.ExplicitName, tc.InferredName) AS ToColumnName,
             rel.IsActive,
             CASE 
                 WHEN rel.FromCardinality = 2 THEN 'Many'
@@ -578,7 +578,7 @@ std::vector<Value> VpaxBuilder::BuildRelationships() {
         FROM Relationship rel
             LEFT JOIN [Table] ft ON rel.FromTableID = ft.id
             LEFT JOIN [Column] fc ON rel.FromColumnID = fc.id
-            LEFT JOIN [Table] tt ON rel.ToTableID = tt.id AND tt.systemflags = 0
+            LEFT JOIN [Table] tt ON rel.ToTableID = tt.id
             LEFT JOIN [Column] tc ON rel.ToColumnID = tc.id
             LEFT JOIN RelationshipStorage rs ON rs.id = rel.RelationshipStorageID
             LEFT JOIN RelationshipIndexStorage rid ON rs.RelationshipIndexStorageID = rid.id
@@ -643,8 +643,8 @@ std::vector<Value> VpaxBuilder::BuildColumnHierarchies() {
     std::string sql = R"(
         SELECT DISTINCT  
             t.Name as TableName,
-            c.ExplicitName as ColumnName, 
-            sc.ExplicitName as StructureName,
+            COALESCE(c.ExplicitName, c.InferredName) as ColumnName, 
+            COALESCE(sc.ExplicitName, sc.InferredName) as StructureName,
             sfi.FileName
         FROM COLUMN c
         JOIN [Table] t 
