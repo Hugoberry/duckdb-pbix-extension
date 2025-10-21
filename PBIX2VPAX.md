@@ -69,20 +69,18 @@ SELECT
     c.TableName as Name,
     NULL as TableName,
     'Modified' as Status,
-    CONCAT(
-        'Rows: ', c.RowsCount, ' (', 
-        CASE WHEN c.RowsCount > p.RowsCount THEN '+' ELSE '' END,
-        c.RowsCount - p.RowsCount, ') | ',
-        'Size: ', ROUND(c.TableSize / 1024.0 / 1024.0, 2), 'MB (',
-        CASE WHEN c.TableSize > p.TableSize THEN '+' ELSE '' END,
-        ROUND((c.TableSize - p.TableSize) / 1024.0 / 1024.0, 2), 'MB) | ',
-        'Last Refresh: ', c.RefreshedTime
-    ) as CurrentDefinition,
-    CONCAT(
-        'Rows: ', p.RowsCount, ' | ',
-        'Size: ', ROUND(p.TableSize / 1024.0 / 1024.0, 2), 'MB | ',
-        'Last Refresh: ', p.RefreshedTime
-    ) as PreviousDefinition
+    {
+        'rows': c.RowsCount,  
+        'rows_delta': c.RowsCount - p.RowsCount,
+        'sizeMB': ROUND(c.TableSize / 1024.0 / 1024.0, 2), 
+        'sizeMB_delta': ROUND((c.TableSize - p.TableSize) / 1024.0 / 1024.0, 2),
+        'last_refresh': c.RefreshedTime
+    } as CurrentDefinition,
+    {
+        'rows': p.RowsCount,
+        'sizeMB': ROUND(p.TableSize / 1024.0 / 1024.0, 2),
+        'last-refresh': p.RefreshedTime,
+    } as PreviousDefinition
 FROM current_tables c
 INNER JOIN previous_tables p ON c.TableName = p.TableName
 WHERE c.RowsCount != p.RowsCount OR ABS(c.TableSize - p.TableSize) > 1024
