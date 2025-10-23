@@ -10,7 +10,7 @@
 class BackupFile {
 public:
     std::optional<std::string> Path;
-    int Size;
+    int64_t Size;
     uint64_t m_cbOffsetHeader;
     bool Delete;
     int64_t CreatedTimestamp;
