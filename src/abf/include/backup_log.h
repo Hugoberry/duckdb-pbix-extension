@@ -21,7 +21,7 @@ class LogBackupFile {
 public:
     std::optional<std::string> Path;
     std::optional<std::string> StoragePath;
-    int Size;
+    int64_t Size;
     int64_t LastWriteTime;
 
     static LogBackupFile from_value(tinyxml2::XMLElement& element, const std::string& encoding);
