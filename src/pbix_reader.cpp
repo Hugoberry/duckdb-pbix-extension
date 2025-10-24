@@ -137,8 +137,19 @@ static void PbixInitInternal(ClientContext &context, const PbixBindData &bind_da
 
     auto col_names = StringUtil::Join(
         local_state.column_ids.data(), local_state.column_ids.size(), ", ", [&](const idx_t column_id) { 
-            return column_id == (column_t)-1 ? "ROWID" : '"' + SQLiteUtils::SanitizeIdentifier(bind_data.names[column_id]) + '"'; 
+            return column_id == (column_t)-1 ? "ROWID" : "'" + SQLiteUtils::SanitizeString(bind_data.names[column_id]) + "'"; 
         });
+
+    // Build ORDER BY clause to maintain column order from column_ids
+    string order_by_clause = "CASE c.ExplicitName ";
+    for (idx_t i = 0; i < local_state.column_ids.size(); i++) {
+        auto column_id = local_state.column_ids[i];
+        if (column_id != (column_t)-1) {
+            order_by_clause += StringUtil::Format("WHEN '%s' THEN %llu ", 
+                SQLiteUtils::SanitizeString(bind_data.names[column_id]), i);
+        }
+    }
+    order_by_clause += "END";
 
     auto sql = StringUtil::Format(R"(
             SELECT 
@@ -158,7 +169,8 @@ static void PbixInitInternal(ClientContext &context, const PbixBindData &bind_da
             JOIN ColumnPartitionStorage cps ON cps.ColumnStorageID = cs.ID
             JOIN StorageFile sfi ON sfi.ID = cps.StorageFileID
             WHERE c.Type = 1 AND t.Name='%s' AND c.ExplicitName IN (%s)
-        )", SQLiteUtils::SanitizeIdentifier(bind_data.table_name), col_names.c_str());
+            ORDER BY %s
+        )", SQLiteUtils::SanitizeString(bind_data.table_name), col_names.c_str(), order_by_clause.c_str());
 
     if (bind_data.rows_per_group.IsValid()) {
         // we are scanning a subset of the rows - generate a WHERE clause based on the rowid

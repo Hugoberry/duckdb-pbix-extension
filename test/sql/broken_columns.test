@@ -1,0 +1,37 @@
+# name: test/sql/broken_columns.test
+# description: test pbix_read with table containing column names that conflict with metadata schema (ID, FileName, Name, Type)
+# group: [pbix]
+
+require pbix
+
+# Test that we can read a table with problematic column names
+# The BrokenColumns table has columns named: ID, FileName, Name, Type
+# These names conflict with column names in the metadata schema and previously caused
+# "ambiguous column name: ID" errors when used in the WHERE IN clause
+
+query I
+SELECT COUNT(*) FROM pbix_read('data/abc.pbix','BrokenColumns');
+----
+3
+
+# Verify we can select all columns including the problematic ones
+query IIII
+SELECT * FROM pbix_read('data/abc.pbix','BrokenColumns') ORDER BY ID;
+----
+100	abc.xlsx	ABC	Red
+102	xyz.pbix	XYZ	Blue
+103	123.exe	123	Black
+
+# Verify we can filter by the problematic column names
+query II
+SELECT ID, Name FROM pbix_read('data/abc.pbix','BrokenColumns') WHERE FileName = 'xyz.pbix';
+----
+102	XYZ
+
+# Verify we can select just the Type column
+query I
+SELECT Type FROM pbix_read('data/abc.pbix','BrokenColumns') ORDER BY ID;
+----
+Red
+Blue
+Black
